@@ -1,3 +1,4 @@
+import type { EventEmitter } from 'node:events'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
@@ -7,6 +8,7 @@ import { AuthService } from './auth/AuthService'
 import { shouldShowHud } from './hud/hudGeometry'
 import { HudPrefs } from './hud/HudPrefs'
 import { HudWindow } from './hud/HudWindow'
+import { FakeCall } from './meeting/FakeCall'
 import { MeetingService, type MeetingInfo } from './meeting/MeetingService'
 import { SessionRecorder } from './sessions/SessionRecorder'
 import { openSessionDatabase, SessionRepository } from './sessions/SessionRepository'
@@ -27,6 +29,7 @@ const FORWARDED_EVENTS = {
 let auth: AuthService
 let settings: SettingsService
 let meeting: MeetingService | null = null
+let fakeCall: FakeCall | null = null
 let tracker: TrackerProcess
 let cameras: CameraDeviceService
 let tray: TrayService
@@ -181,26 +184,21 @@ function startTracker(): void {
   }
 }
 
-/** Meeting detection needs Azure AD + relay configuration; stays off until a user is signed in. */
-async function startMeetingService(): Promise<void> {
-  const functionBaseUrl = process.env['FUNCTION_BASE_URL']
-  const clientState = process.env['GRAPH_CLIENT_STATE']
-  if (meeting || !functionBaseUrl || !clientState) return
-
-  meeting = new MeetingService({ auth, functionBaseUrl, clientState })
+/** Connects call events (from MeetingService, or the dev fake call) to tracker, HUD and store. */
+function bindCallEvents(source: EventEmitter): void {
   for (const [event, channel] of Object.entries(FORWARDED_EVENTS)) {
-    meeting.on(event, () => broadcast(channel))
+    source.on(event, () => broadcast(channel))
   }
   // The tracker (and webcam) runs for exactly the duration of a detected call.
-  meeting.on('MEETING_STARTED', () => {
+  source.on('MEETING_STARTED', () => {
     startTracker()
     beginSession()
   })
-  meeting.on('MEETING_ENDED', () => {
+  source.on('MEETING_ENDED', () => {
     void tracker.stop()
     endSession()
   })
-  meeting.on('MEETING_INFO', (info: MeetingInfo) => {
+  source.on('MEETING_INFO', (info: MeetingInfo) => {
     const r = recorder
     if (r) {
       sessionReady = sessionReady.then(() =>
@@ -208,15 +206,46 @@ async function startMeetingService(): Promise<void> {
       )
     }
   })
-  meeting.on('SPEAKER_ACTIVE', () => hud.setSpeakerActive(true))
-  meeting.on('SPEAKER_INACTIVE', () => hud.setSpeakerActive(false))
+  source.on('SPEAKER_ACTIVE', () => hud.setSpeakerActive(true))
+  source.on('SPEAKER_INACTIVE', () => hud.setSpeakerActive(false))
+}
+
+/** Meeting detection needs Azure AD + relay configuration; stays off until a user is signed in. */
+async function startMeetingService(): Promise<void> {
+  const functionBaseUrl = process.env['FUNCTION_BASE_URL']
+  const clientState = process.env['GRAPH_CLIENT_STATE']
+  if (meeting || !functionBaseUrl || !clientState) return
+
+  meeting = new MeetingService({ auth, functionBaseUrl, clientState })
+  bindCallEvents(meeting)
   await meeting.start()
+}
+
+/** Dev only (never in a packaged build): simulate a Teams call without Azure/Graph. */
+function startFakeCallIfRequested(): void {
+  if (app.isPackaged || process.env['FAKE_CALL'] !== '1') return
+  fakeCall = new FakeCall({
+    durationSeconds: Number(process.env['FAKE_CALL_SECONDS']) || 60,
+    onFinished: async () => {
+      await sessionReady.catch(() => undefined)
+      const last = (await sessions?.listSessions())?.[0]
+      const summary = last ? await sessions?.getSessionSummary(last.id) : null
+      // Aggregates only; no per-event data.
+      console.log('[fake-call] session summary', JSON.stringify(summary))
+      if (process.env['FAKE_CALL_QUIT'] === '1') app.quit()
+    }
+  })
+  bindCallEvents(fakeCall)
+  fakeCall.start()
 }
 
 function stopMeetingService(): void {
   meeting?.stop()
   meeting?.removeAllListeners()
   meeting = null
+  fakeCall?.stop()
+  fakeCall?.removeAllListeners()
+  fakeCall = null
   void tracker?.stop()
   if (sessionStartedAt !== null) endSession()
 }
@@ -347,6 +376,7 @@ void app.whenReady().then(async () => {
   await tray.create()
 
   if (await auth.getSignedInUser().catch(() => null)) await startMeetingService()
+  startFakeCallIfRequested()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

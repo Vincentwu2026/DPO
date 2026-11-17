@@ -80,6 +80,20 @@ left open by a crash are closed on the next start. Renderers can only read it th
 `window.sessions.list()` and `getSummary(id)` calls; the file path is never exposed. Summaries are
 time-weighted, and a gap of more than 2 s between events is not counted.
 
+### Trying the HUD without Teams
+
+In development you can simulate a call, with no Azure/Graph setup, using your real webcam:
+
+```bash
+cd electron
+FAKE_CALL=1 FAKE_CALL_SECONDS=90 npx electron-vite dev
+```
+
+The HUD appears at the top right of the screen, shows an "Active presenter" badge for a few
+seconds, and a session is written to `sessions.db`. Add `FAKE_CALL_QUIT=1` to exit when the call
+ends; a session summary (aggregates only) is then printed to the console. This hook is ignored in
+packaged builds.
+
 Known limits: Windows is untested, the zone thresholds are untuned, and the HUD has only been
 checked at 2x DPI on macOS.
 
