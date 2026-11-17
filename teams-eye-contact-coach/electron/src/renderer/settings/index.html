@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    />
+    <title>Settings</title>
+    <style>
+      body {
+        font:
+          12px -apple-system,
+          'Segoe UI',
+          system-ui,
+          sans-serif;
+        margin: 0;
+        padding: 10px;
+        background: #f7f8fa;
+        color: #1f2328;
+        user-select: none;
+      }
+      #drag {
+        -webkit-app-region: drag;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      fieldset {
+        border: 1px solid #e5e7eb;
+        margin: 0 0 8px;
+        padding: 4px 8px;
+      }
+      legend {
+        color: #57606a;
+        padding: 0 4px;
+      }
+      label {
+        display: block;
+        margin: 2px 0;
+      }
+      select,
+      input[type='range'] {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      button {
+        width: 100%;
+        padding: 4px;
+        margin-top: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="drag">Settings</div>
+
+    <fieldset>
+      <legend>Tracking mode</legend>
+      <label><input type="radio" name="trackingMode" value="realtime" /> Real-time</label>
+      <label><input type="radio" name="trackingMode" value="postcall" /> Post-call</label>
+      <label><input type="radio" name="trackingMode" value="both" /> Both</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Camera</legend>
+      <select id="cameraIndex" aria-label="Camera"></select>
+    </fieldset>
+
+    <fieldset>
+      <legend>Look-away alert: <span id="thresholdLabel"></span>s</legend>
+      <input id="alertThresholdSeconds" type="range" min="1" max="30" step="1" />
+      <label><input id="alertAudioEnabled" type="checkbox" /> Audio alert</label>
+      <label><input id="alertVisualEnabled" type="checkbox" /> Visual alert</label>
+    </fieldset>
+
+    <button id="save" type="button">Save</button>
+    <button id="close" type="button">Close</button>
+
+    <script type="module" src="./settings.ts"></script>
+  </body>
+</html>

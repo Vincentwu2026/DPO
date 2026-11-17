@@ -1,0 +1,38 @@
+appId: com.teamseyecontactcoach.app
+productName: Teams Eye Contact Coach
+directories:
+  buildResources: build
+files:
+  - out/**/*
+  - resources/**/*
+  - '!resources/tracker/**'
+  - package.json
+asar: true
+# Native module: its .node binary must live outside the asar to be dlopen'ed.
+asarUnpack:
+  - node_modules/better-sqlite3/**
+# Executables cannot run from inside the asar; the PyInstaller bundle (npm run build:tracker) is
+# copied next to it and resolved at runtime as process.resourcesPath/tracker/.
+extraResources:
+  - from: resources/tracker
+    to: tracker
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: ${productName}
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  category: public.app-category.productivity
+  hardenedRuntime: true
+dmg:
+  artifactName: ${name}-${version}.${ext}

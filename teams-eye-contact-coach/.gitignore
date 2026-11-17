@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+# Build output
+dist/
+out/
+release/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+secrets.*
+local.settings.json
+
+# Local data
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Downloaded ML models (run: npm run fetch:model)
+python/models/*.task
+
+# PyInstaller output (npm run build:tracker)
+electron/resources/tracker/
+python/build/
+python/dist/
+*.spec

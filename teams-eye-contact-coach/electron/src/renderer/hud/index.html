@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Eye Contact HUD</title>
+    <link rel="stylesheet" href="./hud.css" />
+  </head>
+  <body>
+    <div id="hud" class="hud" data-zone="none">
+      <div id="grip" class="grip" title="Drag to move" aria-label="Move HUD">
+        <span class="grip-dots" aria-hidden="true"></span>
+        <button id="collapse" class="collapse" type="button" aria-label="Collapse HUD">
+          <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">
+            <path d="M2 5h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="body">
+        <div class="gauge" role="img" aria-label="Camera eye contact percentage">
+          <svg viewBox="0 0 64 64" width="56" height="56" aria-hidden="true">
+            <circle class="gauge-track" cx="32" cy="32" r="26" />
+            <circle
+              id="gauge-arc"
+              class="gauge-arc"
+              cx="32"
+              cy="32"
+              r="26"
+              transform="rotate(-90 32 32)"
+            />
+          </svg>
+          <span id="gauge-text" class="gauge-text">--</span>
+        </div>
+
+        <div class="info">
+          <div class="row">
+            <span id="zone-dot" class="zone-dot" aria-hidden="true"></span>
+            <span id="zone-label" class="zone-label">Waiting</span>
+          </div>
+          <div id="timer" class="timer">0:00</div>
+          <div id="presenter" class="presenter" hidden>Active presenter</div>
+        </div>
+      </div>
+
+      <!-- Shown only while collapsed: a small dot that expands the HUD on click, or drags it. -->
+      <div id="mini" class="mini" title="Click to expand, drag to move">
+        <span id="mini-dot" class="zone-dot" aria-hidden="true"></span>
+      </div>
+    </div>
+    <script type="module" src="./hud.ts"></script>
+  </body>
+</html>

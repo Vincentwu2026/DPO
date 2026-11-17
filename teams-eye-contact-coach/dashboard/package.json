@@ -1,0 +1,6 @@
+{
+  "name": "@teams-eye-contact-coach/dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloud dashboard SPA (stub; implemented in Sub-Task 8)"
+}

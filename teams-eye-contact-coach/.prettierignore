@@ -1,0 +1,8 @@
+node_modules
+dist
+out
+.venv
+__pycache__
+package-lock.json
+*.py
+teams-eye-contact-coach-plan.md

@@ -1,0 +1,23 @@
+{
+  "name": "@teams-eye-contact-coach/azure-function",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Graph change-notification relay (Azure Functions v4) with embedded WebSocket hub",
+  "main": "dist/src/functions/*.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "start": "npm run build && func start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.17.1",
+    "ws": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "@types/ws": "^8.18.1",
+    "vitest": "^5.1.0"
+  }
+}

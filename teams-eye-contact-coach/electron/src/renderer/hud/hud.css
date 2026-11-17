@@ -1,0 +1,219 @@
+:root {
+  --zone-camera: #22c55e;
+  --zone-screen: #f59e0b;
+  --zone-away: #ef4444;
+  --zone-none: #6b7280;
+  --gauge-circumference: 163.363; /* 2 * PI * 26, keep in sync with hud.ts */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  font:
+    12px -apple-system,
+    'Segoe UI',
+    system-ui,
+    sans-serif;
+  color: #f3f4f6;
+}
+
+.hud {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  background: rgba(17, 20, 26, 0.86);
+  /* Constant-width border so the alert state only changes colour, never layout. */
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.hud[data-zone='camera'] {
+  --zone: var(--zone-camera);
+}
+.hud[data-zone='screen'] {
+  --zone: var(--zone-screen);
+}
+.hud[data-zone='away'] {
+  --zone: var(--zone-away);
+}
+.hud[data-zone='none'] {
+  --zone: var(--zone-none);
+}
+
+/* Drag handle + collapse control (the only interactive regions of the expanded HUD). */
+.grip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 18px;
+  padding: 0 4px 0 8px;
+  cursor: grab;
+}
+.grip:active {
+  cursor: grabbing;
+}
+.grip-dots {
+  width: 28px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.28);
+}
+.collapse {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #d1d5db;
+  cursor: pointer;
+}
+.collapse:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+}
+
+.gauge {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  flex: none;
+}
+.gauge svg {
+  display: block;
+}
+.gauge-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-width: 6;
+}
+.gauge-arc {
+  fill: none;
+  stroke: var(--zone);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: var(--gauge-circumference);
+  stroke-dashoffset: var(--gauge-circumference);
+  transition:
+    stroke-dashoffset 0.4s ease,
+    stroke 0.25s ease;
+}
+.gauge-text {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.zone-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--zone);
+  transition: background-color 0.25s ease;
+}
+.zone-label {
+  font-weight: 600;
+}
+.timer {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: #e5e7eb;
+}
+.presenter {
+  width: fit-content;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(59, 130, 212, 0.9);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.presenter[hidden] {
+  display: none;
+}
+
+/* Collapsed mode: just the zone dot in a 32x32 window. */
+.mini {
+  display: none;
+  position: absolute;
+  inset: 0;
+  place-items: center;
+  cursor: pointer;
+}
+.mini .zone-dot {
+  width: 14px;
+  height: 14px;
+}
+.hud.collapsed {
+  border-radius: 16px;
+}
+.hud.collapsed .grip,
+.hud.collapsed .body {
+  display: none;
+}
+.hud.collapsed .mini {
+  display: grid;
+}
+
+/* Alert: red pulsing border. */
+.hud.alert {
+  border-color: var(--zone-away);
+  animation: hud-pulse 1s ease-in-out infinite;
+}
+@keyframes hud-pulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 0 rgba(239, 68, 68, 0);
+    border-color: rgba(239, 68, 68, 0.55);
+  }
+  50% {
+    box-shadow: inset 0 0 14px 2px rgba(239, 68, 68, 0.7);
+    border-color: rgba(239, 68, 68, 1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud.alert {
+    animation: none;
+    box-shadow: inset 0 0 10px 2px rgba(239, 68, 68, 0.7);
+  }
+  .gauge-arc,
+  .zone-dot {
+    transition: none;
+  }
+}

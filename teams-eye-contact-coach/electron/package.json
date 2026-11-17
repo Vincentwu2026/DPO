@@ -1,0 +1,35 @@
+{
+  "name": "@teams-eye-contact-coach/electron",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Teams Eye Contact Coach desktop app",
+  "author": "Teams Eye Contact Coach",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "start": "electron-vite preview",
+    "build": "npm run typecheck && electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run",
+    "build:unpack": "npm run build && electron-builder --dir",
+    "build:win": "npm run build && electron-builder --win nsis",
+    "build:mac": "npm run build && electron-builder --mac dmg"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^22.19.0",
+    "@types/ws": "^8.18.2",
+    "electron": "^45.3.3",
+    "electron-builder": "^26.18.0",
+    "electron-vite": "^6.0.0",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^7.2.2",
+    "better-sqlite3": "^13.2.0",
+    "electron-store": "^12.0.0",
+    "keytar": "^7.9.0",
+    "ws": "^8.23.0"
+  }
+}

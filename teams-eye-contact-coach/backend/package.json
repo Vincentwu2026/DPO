@@ -1,0 +1,6 @@
+{
+  "name": "@teams-eye-contact-coach/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloud dashboard REST API (stub; implemented in Sub-Task 8)"
+}
