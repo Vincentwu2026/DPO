@@ -101,32 +101,41 @@ function attachDrag(handle: HTMLElement, onClick?: () => void): void {
   let start: { x: number; y: number } | null = null
   let moved = false
 
-  handle.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0 || (e.target as Element).closest('button')) return
-    start = { x: e.screenX, y: e.screenY }
-    moved = false
-    dragging = true
-    handle.setPointerCapture(e.pointerId)
-    window.hud.dragStart()
-  })
-  handle.addEventListener('pointermove', (e) => {
+  // Move/up are tracked on `window` for the duration of the drag rather than relying on pointer
+  // capture: the window itself moves under the cursor, and a missed pointerup must never leave
+  // the HUD stuck in drag mode.
+  const onMove = (e: PointerEvent): void => {
     if (!start) return
     const dx = e.screenX - start.x
     const dy = e.screenY - start.y
     if (Math.hypot(dx, dy) >= DRAG_CLICK_THRESHOLD_PX) moved = true
     if (moved) window.hud.dragMove(dx, dy)
-  })
+  }
   const finish = (e: PointerEvent): void => {
     if (!start) return
     start = null
     dragging = false
-    if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId)
+    window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerup', finish)
+    window.removeEventListener('pointercancel', finish)
+    window.removeEventListener('blur', cancel)
     window.hud.dragEnd()
     if (!handle.matches(':hover')) window.hud.setIgnoreMouse(true)
     if (!moved && e.type === 'pointerup') onClick?.()
   }
-  handle.addEventListener('pointerup', finish)
-  handle.addEventListener('pointercancel', finish)
+  const cancel = (): void => finish(new PointerEvent('pointercancel'))
+
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || (e.target as Element).closest('button')) return
+    start = { x: e.screenX, y: e.screenY }
+    moved = false
+    dragging = true
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', finish)
+    window.addEventListener('pointercancel', finish)
+    window.addEventListener('blur', cancel)
+    window.hud.dragStart()
+  })
 }
 
 attachDrag(gripEl)

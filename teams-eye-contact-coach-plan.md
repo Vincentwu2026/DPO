@@ -226,7 +226,7 @@ Create the Electron main-process module that spawns the Python side-process, man
 
 ### Sub-Task 5 — Real-Time HUD Overlay
 
-**Status:** [ ] pending
+**Status:** [x] done (verified on Apple Silicon in a real Electron 45 window at 2x DPI: gauge, zone dot, timer, presenter badge, collapse/expand, drag with persisted position, click-through toggling. Windows, 1x DPI and screen-share exclusion by Teams were not verified; `setContentProtection` is applied but not tested against a real share.)
 
 **Intent:**
 Create a floating, always-on-top, transparent Electron window that displays live gaze feedback — a camera eye-contact percentage gauge, a current zone indicator, and a session timer — without blocking click-through to other windows.
@@ -262,7 +262,7 @@ Create a floating, always-on-top, transparent Electron window that displays live
 
 ### Sub-Task 6 — Alert System
 
-**Status:** [ ] pending
+**Status:** [x] done (AlertEngine unit-tested; HUD pulse and alert:fire/alert:reset verified in Electron. Audio playback uses a bundled WAV via Web Audio but was not listened to or tested end to end.)
 
 **Intent:**
 Implement configurable real-time alerts that fire when the presenter has been looking away from the camera beyond a threshold, using both a visual screen flash and an audio cue.
@@ -296,7 +296,7 @@ Implement configurable real-time alerts that fire when the presenter has been lo
 
 ### Sub-Task 7 — Session Data Store
 
-**Status:** [ ] pending
+**Status:** [x] done (SQLite verified under the Electron 45 ABI and inside the packaged `.app`; events visible within ~265 ms. Closing on MEETING_ENDED/quit and orphan cleanup are wired but were not exercised against a live Teams call.)
 
 **Intent:**
 Persist every session's gaze event timeline and aggregate statistics to a local SQLite database, preparing the data for both the in-app post-session report and cloud upload.

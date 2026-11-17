@@ -60,6 +60,29 @@ stdin is closed. Frames are processed in memory only and are never stored or tra
 The zone thresholds in `python/gaze/classifier.py` (`GazeThresholds`) are starting values and
 should be tuned against real footage. macOS prompts for camera permission on first use.
 
+## HUD, alerts and session history
+
+While a Teams call is detected, the main process opens a small floating HUD (transparent,
+always-on-top, hidden from screen capture, click-through except its drag grip and collapse button).
+It shows the camera eye-contact percentage, the current zone (green camera, amber screen, red away),
+a session timer and an "Active presenter" badge. Its position and collapsed state are remembered.
+The HUD and alerts run in the `realtime` and `both` tracking modes; in `postcall` mode the tracker
+still records but nothing is shown.
+
+An alert fires after the configured number of consecutive off-camera seconds (default 5, with a 3 s
+grace period at the start of a session) and clears when you look back at the camera. It pulses a red
+border and/or plays a short ping (`electron/resources/sounds/ping.wav`, regenerate with
+`node scripts/generate-alert-sound.mjs`), depending on the settings.
+
+Every gaze event is stored in a local SQLite database, `sessions.db` in the app's user-data folder,
+together with the meeting subject. The schema is versioned with `PRAGMA user_version`, and sessions
+left open by a crash are closed on the next start. Renderers can only read it through the typed
+`window.sessions.list()` and `getSummary(id)` calls; the file path is never exposed. Summaries are
+time-weighted, and a gap of more than 2 s between events is not counted.
+
+Known limits: Windows is untested, the zone thresholds are untuned, and the HUD has only been
+checked at 2x DPI on macOS.
+
 ## Scripts
 
 | Command                 | Description                                           |
