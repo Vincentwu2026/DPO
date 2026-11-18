@@ -206,6 +206,43 @@ describe('speaking-time breakdown', () => {
   })
 })
 
+describe('cloud sync bookkeeping', () => {
+  let repo: SessionRepository
+  beforeEach(() => {
+    repo = new SessionRepository(new Database(':memory:'))
+  })
+
+  it('lists only closed, unsynced sessions, oldest first', async () => {
+    const a = await repo.createSession({ trackingMode: 'realtime', startedAt: 200 })
+    const b = await repo.createSession({ trackingMode: 'realtime', startedAt: 100 })
+    const open = await repo.createSession({ trackingMode: 'realtime', startedAt: 300 })
+    await repo.closeSession(a, 210)
+    await repo.closeSession(b, 110)
+    expect(await repo.listUnsyncedSessionIds()).toEqual([b, a])
+
+    await repo.markSynced(b)
+    expect(await repo.listUnsyncedSessionIds()).toEqual([a])
+    expect(await repo.listUnsyncedSessionIds()).not.toContain(open)
+  })
+
+  it('returns events with their speaking tags for upload, and null for open sessions', async () => {
+    const id = await repo.createSession({ trackingMode: 'both', subject: 'Talk', startedAt: 0 })
+    await repo.insertGazeEvents(id, [
+      { ts: 1, zone: 'camera', confidence: 0.9, speaking: true },
+      { ts: 2, zone: 'away', confidence: 0.9 }
+    ])
+    expect(await repo.getSyncSource(id)).toBeNull() // still open
+    await repo.closeSession(id, 5)
+    const src = await repo.getSyncSource(id)
+    expect(src?.meta).toMatchObject({ id, subject: 'Talk', startedAt: 0, endedAt: 5 })
+    expect(src?.events).toEqual([
+      { ts: 1, zone: 'camera', speaking: true },
+      { ts: 2, zone: 'away', speaking: false }
+    ])
+    expect(await repo.getSyncSource('missing')).toBeNull()
+  })
+})
+
 describe('migrate', () => {
   it('is idempotent', () => {
     const db = new Database(':memory:')
@@ -249,6 +286,16 @@ describe('migrate', () => {
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION)
     expect(db.prepare('SELECT speaking FROM gaze_events').get()).toEqual({ speaking: 0 })
     expect(db.prepare('SELECT subject FROM sessions').get()).toEqual({ subject: 'Old call' })
+  })
+
+  it('never queues sessions recorded before cloud sync existed', () => {
+    const db = new Database(':memory:')
+    migrate(db)
+    db.pragma('user_version = 2')
+    db.exec('ALTER TABLE sessions DROP COLUMN synced_at')
+    db.exec("INSERT INTO sessions VALUES ('old', NULL, 'Old', 'both', 0, 10)")
+    migrate(db)
+    expect(db.prepare('SELECT synced_at FROM sessions').get()).toEqual({ synced_at: 0 })
   })
 
   it('refuses a database written by a newer app version', () => {

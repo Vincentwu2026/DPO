@@ -331,7 +331,7 @@ Persist every session's gaze event timeline and aggregate statistics to a local 
 
 ### Sub-Task 8 — Cloud Dashboard Backend
 
-**Status:** [ ] pending
+**Status:** [-] partially done — backend API and desktop sync complete; dashboard SPA and Azure deployment config remain (todos 6–7)
 
 **Intent:**
 Build a lightweight REST API backend and a web dashboard so coaches and managers can view presenter gaze history across sessions.

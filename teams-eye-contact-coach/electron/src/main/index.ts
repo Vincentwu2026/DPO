@@ -13,6 +13,7 @@ import { MeetingService, type MeetingInfo } from './meeting/MeetingService'
 import { SessionRecorder } from './sessions/SessionRecorder'
 import { openSessionDatabase, SessionRepository } from './sessions/SessionRepository'
 import { isSettingsKey, SettingsService, type Settings } from './settings/SettingsService'
+import { SyncService } from './sync/SyncService'
 import { CameraDeviceService } from './tracker/CameraDeviceService'
 import { isValidCameraIndex } from './tracker/protocol'
 import { TrackerProcess } from './tracker/TrackerProcess'
@@ -37,6 +38,7 @@ let hud: HudWindow
 let alerts: AlertEngine
 let sessions: SessionRepository | null = null
 let recorder: SessionRecorder | null = null
+let sync: SyncService | null = null
 let settingsWindow: BrowserWindow | null = null
 /** Epoch ms when the current call's session began; null outside a call. */
 let sessionStartedAt: number | null = null
@@ -177,7 +179,35 @@ function endSession(): void {
   setSpeaker(false)
   applyHud()
   const r = recorder
-  if (r) sessionReady = sessionReady.then(() => r.end())
+  if (r) {
+    sessionReady = sessionReady.then(async () => {
+      const id = await r.end()
+      // Upload in the background; a failure leaves the session queued for the next sync.
+      if (id) void sync?.syncSession(id).catch(() => undefined)
+    })
+  }
+}
+
+/** Cloud sync needs the API URL and scope; without them the app stays local-only. */
+function createSyncService(): SyncService | null {
+  const apiBaseUrl = process.env['API_BASE_URL']
+  const scope = process.env['API_SCOPE']
+  if (!sessions || !apiBaseUrl || !scope) return null
+  try {
+    return new SyncService({
+      store: sessions,
+      apiBaseUrl,
+      scope,
+      getToken: (scopes) => auth.getAccessTokenSilent(scopes)
+    })
+  } catch (err) {
+    console.error('Cloud sync disabled', err instanceof Error ? err.message : 'unknown')
+    return null
+  }
+}
+
+function syncPendingSessions(): void {
+  void sync?.syncPending().catch(() => undefined)
 }
 
 function startTracker(): void {
@@ -262,6 +292,7 @@ function stopMeetingService(): void {
 async function signIn(): Promise<void> {
   await auth.signIn()
   await startMeetingService()
+  syncPendingSessions()
 }
 
 async function signOut(): Promise<void> {
@@ -340,7 +371,11 @@ void app.whenReady().then(async () => {
     }
   }
 
-  auth = new AuthService({ openBrowser: (url) => shell.openExternal(url) })
+  const apiScope = process.env['API_SCOPE']
+  auth = new AuthService({
+    openBrowser: (url) => shell.openExternal(url),
+    ...(apiScope ? { extraScopesToConsent: [apiScope] } : {})
+  })
   settings = new SettingsService()
   alerts = new AlertEngine({ thresholdSeconds: settings.getAlertThresholdSeconds() })
   hud = new HudWindow({
@@ -366,6 +401,7 @@ void app.whenReady().then(async () => {
     sessions = null
     recorder = null
   }
+  sync = createSyncService()
   setupTracker()
   tray = new TrayService({
     auth,
@@ -385,7 +421,10 @@ void app.whenReady().then(async () => {
   createWindow()
   await tray.create()
 
-  if (await auth.getSignedInUser().catch(() => null)) await startMeetingService()
+  if (await auth.getSignedInUser().catch(() => null)) {
+    await startMeetingService()
+    syncPendingSessions()
+  }
   startFakeCallIfRequested()
 
   app.on('activate', () => {

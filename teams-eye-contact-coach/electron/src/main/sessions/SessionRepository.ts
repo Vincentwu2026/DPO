@@ -53,6 +53,11 @@ export interface SessionSummary extends SessionMeta, ZoneBreakdown {
   speaking: ZoneBreakdown
 }
 
+export interface SyncSource {
+  meta: SessionMeta & { endedAt: number }
+  events: { ts: number; zone: Zone; speaking: boolean }[]
+}
+
 /** Append-only list: index i migrates schema version i → i+1. Never edit a released migration. */
 const MIGRATIONS: ReadonlyArray<(db: Database.Database) => void> = [
   (db) =>
@@ -79,6 +84,13 @@ const MIGRATIONS: ReadonlyArray<(db: Database.Database) => void> = [
     db.exec(`
       ALTER TABLE gaze_events
         ADD COLUMN speaking INTEGER NOT NULL DEFAULT 0 CHECK (speaking IN (0, 1));
+    `),
+  // v3: cloud upload bookkeeping. NULL = waiting to upload. Sessions recorded before this version
+  // have no speaking tags and were captured before sync existed, so they are never uploaded.
+  (db) =>
+    db.exec(`
+      ALTER TABLE sessions ADD COLUMN synced_at REAL;
+      UPDATE sessions SET synced_at = 0;
     `)
 ]
 
@@ -263,6 +275,34 @@ export class SessionRepository {
       durationSeconds: Math.max(0, end - row.started_at),
       ...overall,
       speaking
+    }
+  }
+
+  /** Closed sessions not yet uploaded, oldest first. */
+  async listUnsyncedSessionIds(): Promise<string[]> {
+    const rows = this.db
+      .prepare(
+        'SELECT id FROM sessions WHERE ended_at IS NOT NULL AND synced_at IS NULL ORDER BY started_at'
+      )
+      .all() as { id: string }[]
+    return rows.map((r) => r.id)
+  }
+
+  async markSynced(sessionId: string): Promise<void> {
+    this.db.prepare('UPDATE sessions SET synced_at = ? WHERE id = ?').run(nowSeconds(), sessionId)
+  }
+
+  /** Everything needed to upload one closed session; null if it is missing or still open. */
+  async getSyncSource(sessionId: string): Promise<SyncSource | null> {
+    const row = this.db.prepare('SELECT * FROM sessions WHERE id = ?').get(sessionId) as
+      SessionRow | undefined
+    if (!row || row.ended_at === null) return null
+    const events = this.db
+      .prepare('SELECT ts, zone, speaking FROM gaze_events WHERE session_id = ? ORDER BY ts, id')
+      .all(sessionId) as { ts: number; zone: Zone; speaking: 0 | 1 }[]
+    return {
+      meta: { ...toMeta(row), endedAt: row.ended_at },
+      events: events.map((e) => ({ ts: e.ts, zone: e.zone, speaking: e.speaking === 1 }))
     }
   }
 

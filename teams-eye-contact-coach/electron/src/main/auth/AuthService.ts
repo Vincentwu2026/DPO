@@ -23,6 +23,8 @@ export interface SignedInUser {
 export interface AuthServiceOptions {
   clientId?: string
   tenantId?: string
+  /** Extra scopes (e.g. the dashboard API) to get consent for during interactive sign-in. */
+  extraScopesToConsent?: string[]
   /** Opens the sign-in URL in the system browser (injected from the Electron main process). */
   openBrowser: (url: string) => Promise<void>
 }
@@ -65,6 +67,9 @@ export class AuthService {
   async signIn(scopes: string[] = GRAPH_SCOPES): Promise<string> {
     const result = await this.getApp().acquireTokenInteractive({
       scopes,
+      ...(this.options.extraScopesToConsent?.length
+        ? { extraScopesToConsent: this.options.extraScopesToConsent }
+        : {}),
       openBrowser: async (url) => {
         // Only ever hand HTTPS URLs to the system browser.
         if (new URL(url).protocol !== 'https:')
@@ -74,6 +79,21 @@ export class AuthService {
     })
     this.account = result.account
     return result.accessToken
+  }
+
+  /**
+   * Silent acquisition only: returns null instead of opening a browser. For background work
+   * (cloud sync) that must never interrupt the user with a sign-in window.
+   */
+  async getAccessTokenSilent(scopes: string[]): Promise<string | null> {
+    try {
+      const account = await this.getCachedAccount()
+      if (!account) return null
+      const result = await this.getApp().acquireTokenSilent({ account, scopes })
+      return result.accessToken
+    } catch {
+      return null
+    }
   }
 
   /** Silent acquisition first; falls back to interactive sign-in when it fails. */

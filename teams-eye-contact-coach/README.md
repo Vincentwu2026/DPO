@@ -118,19 +118,48 @@ the cloud dashboard reports. Sessions recorded before this change count as not s
 Known limits: Windows is untested, the zone thresholds are untuned, and the HUD has only been
 checked at 2x DPI on macOS.
 
+## Cloud sync and dashboard API
+
+The desktop app can upload finished sessions to a small REST API (`backend/`, Fastify + PostgreSQL).
+It is optional: without `API_BASE_URL` and `API_SCOPE` in `electron/.env` the app stays local-only.
+
+**What is uploaded:** only the time you were the active speaker, as run-length segments
+(`start`, `duration`, `zone`) plus the session's date, mode and Teams subject. Time spent listening
+is never sent. **Who can see it:** only you. The API takes your identity from the validated Entra
+token (`oid` claim), never from a request parameter; another user's session id returns 404.
+
+- `POST /api/sessions` stores a session (idempotent on the session UUID).
+- `GET /api/sessions?limit=&before=` lists your sessions, newest first.
+- `GET /api/sessions/:id` returns the speaking-time breakdown and a timeline.
+
+After a call ends, the desktop app uploads in the background using a silent token (it never opens a
+sign-in window), retrying with exponential back-off (1 s, 2 s; 3 attempts). Anything that fails is
+retried at the next start-up or sign-in. Sessions recorded before this feature are not uploaded.
+
+Run the API locally: copy `backend/.env.example` to `backend/.env`, fill it in, then
+`npm run dev --workspace backend`. It binds to `127.0.0.1` and refuses `0.0.0.0`. You need an Entra
+app registration for the API that exposes a delegated scope `Sessions.ReadWrite`, and the desktop
+app's registration must be granted that scope. `npm test --workspace backend` needs no cloud
+resources (PostgreSQL runs in-process via PGlite; tokens are signed with a test key).
+
+Not yet verified against real services: Entra token validation with live JWKS, `pg` against Azure
+Database for PostgreSQL, and an Azure App Service deployment. The web dashboard (`dashboard/`) and
+the Azure Static Web Apps / App Service configuration are not built yet.
+
 ## Scripts
 
-| Command                 | Description                                           |
-| ----------------------- | ----------------------------------------------------- |
-| `npm run dev`           | Start Electron (dev mode) and the Python gaze tracker |
-| `npm run fetch:model`   | Download the FaceLandmarker model                     |
-| `npm run build:tracker` | Bundle the Python tracker (PyInstaller) for packaging |
-| `npm run test:py`       | Run the Python unit tests (pytest)                    |
-| `npm run lint`          | ESLint (TypeScript) + Ruff and Black check (Python)   |
-| `npm run format`        | Prettier (JS/TS/JSON/MD) + Black (Python)             |
-| `npm run format:check`  | Prettier check                                        |
-| `npm run typecheck`     | `tsc --noEmit` for the Electron main/preload/renderer |
-| `npm run build`         | Type-check and build the Electron app                 |
+| Command                 | Description                                             |
+| ----------------------- | ------------------------------------------------------- |
+| `npm run dev`           | Start Electron (dev mode) and the Python gaze tracker   |
+| `npm run fetch:model`   | Download the FaceLandmarker model                       |
+| `npm run build:tracker` | Bundle the Python tracker (PyInstaller) for packaging   |
+| `npm run test:py`       | Run the Python unit tests (pytest)                      |
+| `npm run lint`          | ESLint (TypeScript) + Ruff and Black check (Python)     |
+| `npm run format`        | Prettier (JS/TS/JSON/MD) + Black (Python)               |
+| `npm run format:check`  | Prettier check                                          |
+| `npm run typecheck`     | `tsc --noEmit` for the Electron main/preload/renderer   |
+| `npm run build`         | Type-check and build the Electron app                   |
+| `npm test -w backend`   | Run the API tests (supertest-style, via Fastify inject) |
 
 Distributables (run from `electron/`): `npm run build:win` (NSIS installer) and
 `npm run build:mac` (DMG). Build each on its target OS.
