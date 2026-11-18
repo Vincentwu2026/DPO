@@ -1,6 +1,7 @@
 import Store from 'electron-store'
 
 export type TrackingMode = 'realtime' | 'postcall' | 'both'
+export type Stability = 'responsive' | 'balanced' | 'steady'
 
 export interface Settings {
   trackingMode: TrackingMode
@@ -8,6 +9,10 @@ export interface Settings {
   alertThresholdSeconds: number
   alertAudioEnabled: boolean
   alertVisualEnabled: boolean
+  /** How strongly the camera/screen/away zone is smoothed (steadier = slower to react). */
+  gazeStability: Stability
+  /** Show the real-time "look at the camera" coaching line on the HUD. */
+  coachingHintsEnabled: boolean
 }
 
 export type SettingsKey = keyof Settings
@@ -17,10 +22,13 @@ export const DEFAULT_SETTINGS: Settings = {
   cameraIndex: 0,
   alertThresholdSeconds: 5,
   alertAudioEnabled: true,
-  alertVisualEnabled: true
+  alertVisualEnabled: true,
+  gazeStability: 'balanced',
+  coachingHintsEnabled: true
 }
 
 const TRACKING_MODES: readonly TrackingMode[] = ['realtime', 'postcall', 'both']
+export const STABILITY_PRESETS: readonly Stability[] = ['responsive', 'balanced', 'steady']
 
 /** Server-side validation: values arrive from the renderer over IPC and must not be trusted. */
 const validators: { [K in SettingsKey]: (value: unknown) => value is Settings[K] } = {
@@ -30,7 +38,9 @@ const validators: { [K in SettingsKey]: (value: unknown) => value is Settings[K]
   alertThresholdSeconds: (v): v is number =>
     typeof v === 'number' && Number.isFinite(v) && v >= 1 && v <= 30,
   alertAudioEnabled: (v): v is boolean => typeof v === 'boolean',
-  alertVisualEnabled: (v): v is boolean => typeof v === 'boolean'
+  alertVisualEnabled: (v): v is boolean => typeof v === 'boolean',
+  gazeStability: (v): v is Stability => STABILITY_PRESETS.includes(v as Stability),
+  coachingHintsEnabled: (v): v is boolean => typeof v === 'boolean'
 }
 
 export function isSettingsKey(key: unknown): key is SettingsKey {
@@ -61,7 +71,9 @@ export class SettingsService {
       cameraIndex: this.get('cameraIndex'),
       alertThresholdSeconds: this.get('alertThresholdSeconds'),
       alertAudioEnabled: this.get('alertAudioEnabled'),
-      alertVisualEnabled: this.get('alertVisualEnabled')
+      alertVisualEnabled: this.get('alertVisualEnabled'),
+      gazeStability: this.get('gazeStability'),
+      coachingHintsEnabled: this.get('coachingHintsEnabled')
     }
   }
 
@@ -98,5 +110,13 @@ export class SettingsService {
   }
   setAlertVisualEnabled(enabled: boolean): void {
     this.set('alertVisualEnabled', enabled)
+  }
+
+  getGazeStability(): Stability {
+    return this.get('gazeStability')
+  }
+
+  getCoachingHintsEnabled(): boolean {
+    return this.get('coachingHintsEnabled')
   }
 }

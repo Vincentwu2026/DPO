@@ -39,10 +39,41 @@ class GazeMeasurement:
     pitch: float
 
 
+def is_away(measurement: GazeMeasurement | None, t: GazeThresholds) -> bool:
+    """No face, or head rotated beyond the away limits."""
+    return (
+        measurement is None
+        or abs(measurement.yaw) > t.away_yaw
+        or abs(measurement.pitch) > t.away_pitch
+    )
+
+
+def deviation(measurement: GazeMeasurement, t: GazeThresholds) -> float:
+    """Largest deviation from the "looking at the camera" pose, in units of its tolerance.
+
+    1.0 is exactly the camera/screen boundary; below it is camera, above it is screen.
+    """
+    return max(
+        abs(measurement.h_ratio - t.h_center) / t.h_tolerance,
+        abs(measurement.v_ratio - t.v_center) / t.v_tolerance,
+        abs(measurement.yaw) / t.camera_max_yaw,
+        abs(measurement.pitch) / t.camera_max_pitch,
+    )
+
+
+def zone_confidence(zone: str, dev: float) -> float:
+    """Confidence for a zone given the (possibly smoothed) deviation, in 0.5 - 1.0."""
+    if zone == ZONE_AWAY:
+        return 1.0
+    if zone == ZONE_CAMERA:
+        return 1.0 - 0.5 * min(dev, 1.0)
+    return min(1.0, 0.5 + 0.5 * max(dev - 1.0, 0.0))
+
+
 def classify(
     measurement: GazeMeasurement | None, thresholds: GazeThresholds | None = None
 ) -> tuple[str, float]:
-    """Classify a measurement into ``(zone, confidence)``.
+    """Classify a single frame into ``(zone, confidence)`` (no temporal smoothing).
 
     * ``away``: no face, or extreme head rotation.
     * ``camera``: iris centred and head frontal (all deviations within tolerance).
@@ -52,21 +83,9 @@ def classify(
     grows with the margin from the camera/screen boundary, in the range 0.5 - 1.0.
     """
     t = thresholds or GazeThresholds()
-
-    if measurement is None:
+    if measurement is None or is_away(measurement, t):
         return ZONE_AWAY, 1.0
 
-    if abs(measurement.yaw) > t.away_yaw or abs(measurement.pitch) > t.away_pitch:
-        return ZONE_AWAY, 1.0
-
-    # Largest deviation from the "looking at the camera" pose, in units of its tolerance.
-    deviation = max(
-        abs(measurement.h_ratio - t.h_center) / t.h_tolerance,
-        abs(measurement.v_ratio - t.v_center) / t.v_tolerance,
-        abs(measurement.yaw) / t.camera_max_yaw,
-        abs(measurement.pitch) / t.camera_max_pitch,
-    )
-
-    if deviation <= 1.0:
-        return ZONE_CAMERA, 1.0 - 0.5 * deviation
-    return ZONE_SCREEN, min(1.0, 0.5 + 0.5 * (deviation - 1.0))
+    dev = deviation(measurement, t)
+    zone = ZONE_CAMERA if dev <= 1.0 else ZONE_SCREEN
+    return zone, zone_confidence(zone, dev)

@@ -68,7 +68,30 @@ describe('TrackerProcess (integration with a mock tracker process)', () => {
       /started on/.test(e.message)
     )
     tracker.start(3)
-    expect((await started).message).toBe('started on camera 3')
+    expect((await started).message).toBe('started on camera 3 stability balanced')
+  })
+
+  it('passes the stability preset on the command line', async () => {
+    const tracker = make()
+    const started = waitFor<TrackerError>(tracker, 'tracker-error', (e) =>
+      /started on/.test(e.message)
+    )
+    tracker.start(0, 'steady')
+    expect((await started).message).toBe('started on camera 0 stability steady')
+  })
+
+  it('setStability writes a set_stability command and rejects unknown presets', async () => {
+    const tracker = make()
+    const ready = waitFor(tracker, 'gaze')
+    tracker.start(0)
+    await ready
+
+    const ack = waitFor<TrackerError>(tracker, 'tracker-error', (e) =>
+      /stability set to/.test(e.message)
+    )
+    expect(tracker.setStability('responsive')).toBe(true)
+    expect((await ack).message).toBe('stability set to responsive')
+    expect(tracker.setStability('extreme')).toBe(false)
   })
 
   it('setCamera writes a set_camera command to stdin without restarting', async () => {

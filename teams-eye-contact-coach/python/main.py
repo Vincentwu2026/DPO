@@ -12,6 +12,7 @@ stdout (this process -> Electron)
 stdin (Electron -> this process)
   {"cmd": "set_camera", "index": N}
   {"cmd": "set_confidence_threshold", "value": 0.0-1.0}
+  {"cmd": "set_stability", "preset": "responsive|balanced|steady"}
 
 Exits cleanly on SIGTERM/SIGINT or when stdin is closed. Frames never leave this process.
 """
@@ -27,6 +28,8 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+
+from gaze.stabilizer import DEFAULT_STABILITY, PRESETS
 
 VERSION = "0.1.0"
 DEFAULT_MODEL = Path(__file__).resolve().parent / "models" / "face_landmarker.task"
@@ -60,6 +63,10 @@ def parse_command(line: str) -> dict[str, Any] | None:
         value = data.get("value")
         if isinstance(value, (int, float)) and not isinstance(value, bool) and 0.0 <= value <= 1.0:
             return {"cmd": "set_confidence_threshold", "value": float(value)}
+    elif data.get("cmd") == "set_stability":
+        preset = data.get("preset")
+        if isinstance(preset, str) and preset in PRESETS:
+            return {"cmd": "set_stability", "preset": preset}
     return None
 
 
@@ -82,6 +89,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--camera-index", type=_camera_index, default=0)
     parser.add_argument("--confidence-threshold", type=_unit_float, default=0.5)
     parser.add_argument("--model", type=Path, default=DEFAULT_MODEL, help="face_landmarker.task")
+    parser.add_argument(
+        "--stability",
+        choices=sorted(PRESETS),
+        default=DEFAULT_STABILITY,
+        help="how strongly the camera/screen/away zone is smoothed",
+    )
     parser.add_argument(
         "--list-devices", action="store_true", help="print the camera list and exit"
     )
@@ -119,7 +132,10 @@ def run(args: argparse.Namespace) -> int:
     commands: queue.Queue[dict[str, Any]] = queue.Queue()
     threading.Thread(target=_read_stdin, args=(commands, stop), daemon=True).start()
 
-    estimator = GazeEstimator(args.model, min_confidence=args.confidence_threshold)
+    stability = args.stability
+    estimator = GazeEstimator(
+        args.model, min_confidence=args.confidence_threshold, stability=stability
+    )
     capture = open_camera(args.camera_index)
     if capture is None:
         emit({"type": "error", "message": f"Cannot open camera {args.camera_index}"})
@@ -141,9 +157,14 @@ def run(args: argparse.Namespace) -> int:
                         if capture is not None:
                             capture.release()
                         capture = new_capture
+                elif command["cmd"] == "set_stability":
+                    stability = command["preset"]
+                    estimator.set_stability(stability)
                 else:
                     estimator.close()
-                    estimator = GazeEstimator(args.model, min_confidence=command["value"])
+                    estimator = GazeEstimator(
+                        args.model, min_confidence=command["value"], stability=stability
+                    )
                 continue
 
             if capture is None:

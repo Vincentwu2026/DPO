@@ -76,8 +76,8 @@ function openSettingsWindow(): void {
     return
   }
   settingsWindow = new BrowserWindow({
-    width: 200,
-    height: 300,
+    width: 240,
+    height: 420,
     frame: false,
     alwaysOnTop: true,
     resizable: false,
@@ -152,6 +152,8 @@ function applyHud(): void {
 /** Call after any settings change (IPC or tray). */
 function onSettingsChanged(): void {
   alerts.setThresholdSeconds(settings.getAlertThresholdSeconds())
+  tracker.setStability(settings.getGazeStability())
+  hud.setHintsEnabled(settings.getCoachingHintsEnabled())
   applyHud()
 }
 
@@ -178,7 +180,7 @@ function endSession(): void {
 
 function startTracker(): void {
   try {
-    tracker.start(settings.getCameraIndex())
+    tracker.start(settings.getCameraIndex(), settings.getGazeStability())
   } catch {
     broadcast('tracker:error', { message: 'The gaze tracker could not be started.', fatal: true })
   }
@@ -335,6 +337,7 @@ void app.whenReady().then(async () => {
   settings = new SettingsService()
   alerts = new AlertEngine({ thresholdSeconds: settings.getAlertThresholdSeconds() })
   hud = new HudWindow({
+    hintsEnabled: settings.getCoachingHintsEnabled(),
     prefs: new HudPrefs(new Store({ name: 'hud' })),
     preloadPath: join(__dirname, '../preload/index.js'),
     loadPage: (win) => loadRenderer(win, 'hud/index.html'),

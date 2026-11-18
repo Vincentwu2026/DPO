@@ -7,6 +7,8 @@ const threshold = $<HTMLInputElement>('alertThresholdSeconds')
 const thresholdLabel = $<HTMLSpanElement>('thresholdLabel')
 const audio = $<HTMLInputElement>('alertAudioEnabled')
 const visual = $<HTMLInputElement>('alertVisualEnabled')
+const hints = $<HTMLInputElement>('coachingHintsEnabled')
+const stability = $<HTMLSelectElement>('gazeStability')
 const modeRadios = document.querySelectorAll<HTMLInputElement>('input[name="trackingMode"]')
 
 function selectedMode(): SettingsValues['trackingMode'] {
@@ -34,6 +36,8 @@ async function load(): Promise<void> {
   thresholdLabel.textContent = threshold.value
   audio.checked = values.alertAudioEnabled
   visual.checked = values.alertVisualEnabled
+  hints.checked = values.coachingHintsEnabled
+  stability.value = values.gazeStability
 }
 
 threshold.addEventListener('input', () => {
@@ -47,7 +51,9 @@ $('save').addEventListener('click', () => {
       cameraIndex: Number(cameraSelect.value),
       alertThresholdSeconds: Number(threshold.value),
       alertAudioEnabled: audio.checked,
-      alertVisualEnabled: visual.checked
+      alertVisualEnabled: visual.checked,
+      coachingHintsEnabled: hints.checked,
+      gazeStability: stability.value as SettingsValues['gazeStability']
     })
     .then(() => window.close())
 })

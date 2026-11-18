@@ -20,6 +20,10 @@ def test_parse_macos_camera_names_handles_bad_input(payload):
 
 def test_parse_command_accepts_valid_commands():
     assert parse_command('{"cmd": "set_camera", "index": 2}') == {"cmd": "set_camera", "index": 2}
+    assert parse_command('{"cmd": "set_stability", "preset": "steady"}') == {
+        "cmd": "set_stability",
+        "preset": "steady",
+    }
     assert parse_command('{"cmd": "set_confidence_threshold", "value": 1}') == {
         "cmd": "set_confidence_threshold",
         "value": 1.0,
@@ -38,6 +42,9 @@ def test_parse_command_accepts_valid_commands():
         '{"cmd": "set_camera", "index": true}',
         '{"cmd": "set_camera", "index": "1"}',
         '{"cmd": "set_confidence_threshold", "value": 1.5}',
+        '{"cmd": "set_stability"}',
+        '{"cmd": "set_stability", "preset": "extreme"}',
+        '{"cmd": "set_stability", "preset": 3}',
         '{"cmd": "unknown"}',
     ],
 )
@@ -50,9 +57,14 @@ def test_cli_defaults_and_overrides():
     assert (args.camera_index, args.confidence_threshold) == (0, 0.5)
     args = build_parser().parse_args(["--camera-index", "3", "--confidence-threshold", "0.7"])
     assert (args.camera_index, args.confidence_threshold) == (3, 0.7)
+    assert build_parser().parse_args([]).stability == "balanced"
+    assert build_parser().parse_args(["--stability", "steady"]).stability == "steady"
 
 
-@pytest.mark.parametrize("flag,value", [("--camera-index", "10"), ("--confidence-threshold", "2")])
+@pytest.mark.parametrize(
+    "flag,value",
+    [("--camera-index", "10"), ("--confidence-threshold", "2"), ("--stability", "extreme")],
+)
 def test_cli_rejects_out_of_range(flag, value):
     with pytest.raises(SystemExit):
         build_parser().parse_args([flag, value])

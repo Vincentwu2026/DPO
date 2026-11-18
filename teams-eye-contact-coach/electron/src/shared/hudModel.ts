@@ -62,3 +62,50 @@ export function gaugeDashOffset(percent: number | null, circumference: number): 
   const p = percent === null || !Number.isFinite(percent) ? 0 : Math.min(100, Math.max(0, percent))
   return circumference * (1 - p / 100)
 }
+
+/** After this many consecutive off-camera seconds the HUD starts nudging (before the red alert). */
+export const NUDGE_AFTER_S = 2
+
+export type HintLevel = 'idle' | 'good' | 'nudge' | 'alert'
+
+export interface Hint {
+  text: string
+  level: HintLevel
+}
+
+/**
+ * The real-time coaching line shown under the gauge.
+ * `offCameraSeconds` is how long the presenter has been continuously off camera; `alerting` is
+ * true while the look-away alert (main process) is firing, which always wins.
+ */
+export function coachingHint(zone: Zone | null, offCameraSeconds: number, alerting: boolean): Hint {
+  if (zone === null) return { text: 'Waiting for camera', level: 'idle' }
+  if (zone === 'camera') return { text: 'Good eye contact', level: 'good' }
+  if (alerting) return { text: 'Look at the camera now', level: 'alert' }
+  if (offCameraSeconds >= NUDGE_AFTER_S) {
+    return {
+      text: zone === 'away' ? 'Face the camera' : 'Look at the camera',
+      level: 'nudge'
+    }
+  }
+  return { text: zone === 'away' ? 'Face the camera' : 'Eyes on screen', level: 'idle' }
+}
+
+/** Tracks continuous off-camera time from event timestamps (seconds). */
+export class OffCameraTimer {
+  private since: number | null = null
+
+  /** Feed each event in order; returns seconds continuously off camera (0 while on camera). */
+  update(ts: number, zone: Zone): number {
+    if (zone === 'camera') {
+      this.since = null
+      return 0
+    }
+    this.since ??= ts
+    return Math.max(0, ts - this.since)
+  }
+
+  reset(): void {
+    this.since = null
+  }
+}

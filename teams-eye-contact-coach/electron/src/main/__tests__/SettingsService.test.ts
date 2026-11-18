@@ -31,7 +31,9 @@ describe('SettingsService', () => {
       cameraIndex: 0,
       alertThresholdSeconds: 5,
       alertAudioEnabled: true,
-      alertVisualEnabled: true
+      alertVisualEnabled: true,
+      gazeStability: 'balanced',
+      coachingHintsEnabled: true
     })
     expect(settings.getAll()).toEqual(DEFAULT_SETTINGS)
   })
@@ -42,12 +44,16 @@ describe('SettingsService', () => {
     settings.setAlertThresholdSeconds(12)
     settings.setAlertAudioEnabled(false)
     settings.setAlertVisualEnabled(false)
+    settings.set('gazeStability', 'steady')
+    settings.set('coachingHintsEnabled', false)
 
     expect(settings.getTrackingMode()).toBe('postcall')
     expect(settings.getCameraIndex()).toBe(2)
     expect(settings.getAlertThresholdSeconds()).toBe(12)
     expect(settings.getAlertAudioEnabled()).toBe(false)
     expect(settings.getAlertVisualEnabled()).toBe(false)
+    expect(settings.getGazeStability()).toBe('steady')
+    expect(settings.getCoachingHintsEnabled()).toBe(false)
   })
 
   it('supports generic get/set by key (used by the IPC handlers)', () => {
@@ -66,7 +72,10 @@ describe('SettingsService', () => {
       ['alertThresholdSeconds', 31],
       ['alertThresholdSeconds', Number.NaN],
       ['alertAudioEnabled', 'yes'],
-      ['alertVisualEnabled', 1]
+      ['alertVisualEnabled', 1],
+      ['gazeStability', 'extreme'],
+      ['gazeStability', 2],
+      ['coachingHintsEnabled', 'on']
     ] as const)('rejects %s = %j and leaves the stored value unchanged', (key, value) => {
       const before = settings.get(key)
       expect(() => settings.set(key, value)).toThrow(/Invalid value/)

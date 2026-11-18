@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isValidCameraIndex, parseTrackerLine } from '../tracker/protocol'
+import { isValidCameraIndex, isValidStability, parseTrackerLine } from '../tracker/protocol'
 
 describe('parseTrackerLine', () => {
   it('parses a valid gaze event', () => {
@@ -51,6 +51,15 @@ describe('parseTrackerLine', () => {
     const msg = parseTrackerLine(JSON.stringify({ type: 'error', message: 'x'.repeat(5000) }))
     expect(msg?.type === 'error' && msg.message.length).toBe(200)
   })
+})
+
+describe('isValidStability', () => {
+  it.each(['responsive', 'balanced', 'steady'])('accepts %s', (v) =>
+    expect(isValidStability(v)).toBe(true)
+  )
+  it.each(['extreme', '', 'Balanced', 1, null, undefined])('rejects %j', (v) =>
+    expect(isValidStability(v)).toBe(false)
+  )
 })
 
 describe('isValidCameraIndex', () => {

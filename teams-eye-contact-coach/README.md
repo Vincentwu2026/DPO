@@ -94,6 +94,20 @@ seconds, and a session is written to `sessions.db`. Add `FAKE_CALL_QUIT=1` to ex
 ends; a session summary (aggregates only) is then printed to the console. This hook is ignored in
 packaged builds.
 
+### Coaching hints and gaze steadiness
+
+The HUD shows a one-line coaching hint under the gauge: "Good eye contact" on camera, a calm
+"Eyes on screen" for a short glance, an amber "Look at the camera" with a soft glow after 2 s off
+camera, and a red "Look at the camera now" once the look-away alert fires. The speaker icon in the
+HUD mutes the alert sound for the current call without changing the saved setting. Hints can be
+turned off in Settings.
+
+The tracker smooths the camera/screen/away zone so it does not flicker (exponential smoothing of
+the gaze deviation, a dead band around the camera/screen boundary, and a short dwell before a
+change is committed). Choose **Responsive**, **Balanced** (default) or **Steady** in Settings; the
+change applies live. On one real 15 s webcam recording the raw classifier flipped 2.3 times per
+second, Balanced 0.3 and Steady 0.07. Steadier presets also react more slowly to a real look-away.
+
 Known limits: Windows is untested, the zone thresholds are untuned, and the HUD has only been
 checked at 2x DPI on macOS.
 

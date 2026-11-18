@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  coachingHint,
   formatElapsed,
   GazeAccumulator,
   gaugeDashOffset,
-  MAX_EVENT_GAP_S
+  MAX_EVENT_GAP_S,
+  NUDGE_AFTER_S,
+  OffCameraTimer
 } from '../../shared/hudModel'
 
 describe('GazeAccumulator', () => {
@@ -74,5 +77,54 @@ describe('gaugeDashOffset', () => {
     expect(gaugeDashOffset(-10, 100)).toBe(100)
     expect(gaugeDashOffset(null, 100)).toBe(100)
     expect(gaugeDashOffset(NaN, 100)).toBe(100)
+  })
+})
+
+describe('coachingHint', () => {
+  it('praises eye contact and waits for the first event', () => {
+    expect(coachingHint(null, 0, false)).toEqual({ text: 'Waiting for camera', level: 'idle' })
+    expect(coachingHint('camera', 0, false)).toEqual({ text: 'Good eye contact', level: 'good' })
+  })
+
+  it('stays calm for a short glance, then nudges', () => {
+    expect(coachingHint('screen', 0.5, false).level).toBe('idle')
+    expect(coachingHint('screen', NUDGE_AFTER_S, false)).toEqual({
+      text: 'Look at the camera',
+      level: 'nudge'
+    })
+  })
+
+  it('tells someone who turned away to face the camera', () => {
+    expect(coachingHint('away', 0.1, false).text).toBe('Face the camera')
+    expect(coachingHint('away', 3, false).level).toBe('nudge')
+  })
+
+  it('escalates to an alert, which wins over the nudge', () => {
+    expect(coachingHint('screen', 6, true)).toEqual({
+      text: 'Look at the camera now',
+      level: 'alert'
+    })
+  })
+
+  it('never shows an alert hint while on camera', () => {
+    expect(coachingHint('camera', 0, true).level).toBe('good')
+  })
+})
+
+describe('OffCameraTimer', () => {
+  it('counts consecutive off-camera time and resets on camera', () => {
+    const t = new OffCameraTimer()
+    expect(t.update(10, 'camera')).toBe(0)
+    expect(t.update(11, 'screen')).toBe(0)
+    expect(t.update(12.5, 'away')).toBeCloseTo(1.5)
+    expect(t.update(13, 'camera')).toBe(0)
+    expect(t.update(14, 'screen')).toBe(0)
+  })
+
+  it('reset() forgets the current look-away', () => {
+    const t = new OffCameraTimer()
+    t.update(1, 'screen')
+    t.reset()
+    expect(t.update(5, 'screen')).toBe(0)
   })
 })

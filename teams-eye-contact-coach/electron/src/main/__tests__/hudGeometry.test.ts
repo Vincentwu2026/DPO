@@ -30,7 +30,7 @@ describe('clampToWorkAreas', () => {
     expect(clampToWorkAreas({ x: -500, y: -500 }, size, [primary])).toEqual({ x: 0, y: 25 })
     expect(clampToWorkAreas({ x: 5000, y: 5000 }, size, [primary])).toEqual({
       x: 1440 - 210,
-      y: 25 + 875 - 96
+      y: 25 + 875 - HUD_EXPANDED.height
     })
   })
 

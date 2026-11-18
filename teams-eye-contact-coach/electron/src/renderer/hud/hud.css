@@ -69,7 +69,11 @@ body {
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.28);
 }
-.collapse {
+.grip-actions {
+  display: flex;
+  gap: 2px;
+}
+.icon-btn {
   display: grid;
   place-items: center;
   width: 16px;
@@ -81,7 +85,7 @@ body {
   color: #d1d5db;
   cursor: pointer;
 }
-.collapse:hover {
+.icon-btn:hover {
   background: rgba(255, 255, 255, 0.16);
 }
 
@@ -167,6 +171,45 @@ body {
   display: none;
 }
 
+/* Real-time coaching line. */
+.hint {
+  margin: 4px 10px 0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgba(255, 255, 255, 0.08);
+  color: #d1d5db;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+.hint[data-level='good'] {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+}
+.hint[data-level='nudge'] {
+  background: rgba(245, 158, 11, 0.9);
+  color: #1f1300;
+}
+.hint[data-level='alert'] {
+  background: rgba(239, 68, 68, 0.95);
+  color: #fff;
+}
+.hint[hidden] {
+  display: none;
+}
+
+/* Gentle amber glow while nudging, before the red alert. */
+.hud.nudge {
+  border-color: var(--zone-screen);
+  box-shadow: inset 0 0 8px 1px rgba(245, 158, 11, 0.45);
+}
+
 /* Collapsed mode: just the zone dot in a 32x32 window. */
 .mini {
   display: none;
@@ -183,7 +226,8 @@ body {
   border-radius: 16px;
 }
 .hud.collapsed .grip,
-.hud.collapsed .body {
+.hud.collapsed .body,
+.hud.collapsed .hint {
   display: none;
 }
 .hud.collapsed .mini {

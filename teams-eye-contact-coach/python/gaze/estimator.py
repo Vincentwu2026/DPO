@@ -14,7 +14,8 @@ import mediapipe as mp
 import numpy as np
 from mediapipe.tasks.python import BaseOptions, vision
 
-from .classifier import GazeMeasurement, GazeThresholds, classify
+from .classifier import GazeMeasurement, GazeThresholds
+from .stabilizer import DEFAULT_STABILITY, GazeStabilizer
 
 # (image-left corner, image-right corner, iris centre) per eye. 468 is the iris of the
 # subject's right eye (image left); 473 is the subject's left eye (image right).
@@ -112,8 +113,10 @@ class GazeEstimator:
         model_path: Path,
         min_confidence: float = 0.5,
         thresholds: GazeThresholds | None = None,
+        stability: str = DEFAULT_STABILITY,
     ) -> None:
         self._thresholds = thresholds or GazeThresholds()
+        self._stabilizer = GazeStabilizer(stability, self._thresholds)
         options = vision.FaceLandmarkerOptions(
             base_options=BaseOptions(model_asset_path=str(model_path)),
             running_mode=vision.RunningMode.VIDEO,
@@ -124,19 +127,26 @@ class GazeEstimator:
         )
         self._landmarker = vision.FaceLandmarker.create_from_options(options)
 
+    def set_stability(self, preset: str) -> None:
+        """Switch the smoothing preset (``responsive`` / ``balanced`` / ``steady``)."""
+        self._stabilizer = GazeStabilizer(preset, self._thresholds)
+
     def process(self, frame_bgr: np.ndarray, timestamp_ms: int) -> tuple[str, float]:
-        """Classify one frame. ``timestamp_ms`` must be strictly increasing between calls."""
+        """Classify one frame into a stabilised ``(zone, confidence)``.
+
+        ``timestamp_ms`` must be strictly increasing between calls.
+        """
         height, width = frame_bgr.shape[:2]
         rgb = np.ascontiguousarray(cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB))
         image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
         result = self._landmarker.detect_for_video(image, timestamp_ms)
 
-        if not result.face_landmarks or len(result.face_landmarks[0]) < _MIN_LANDMARKS:
-            return classify(None, self._thresholds)
-
-        landmarks = result.face_landmarks[0]
-        points = np.array([(lm.x * width, lm.y * height) for lm in landmarks], dtype=np.float64)
-        return classify(measure(points, width, height), self._thresholds)
+        measurement: GazeMeasurement | None = None
+        if result.face_landmarks and len(result.face_landmarks[0]) >= _MIN_LANDMARKS:
+            landmarks = result.face_landmarks[0]
+            points = np.array([(lm.x * width, lm.y * height) for lm in landmarks], dtype=np.float64)
+            measurement = measure(points, width, height)
+        return self._stabilizer.update(timestamp_ms / 1000.0, measurement)
 
     def close(self) -> None:
         self._landmarker.close()

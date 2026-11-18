@@ -13,6 +13,8 @@ export interface SettingsValues {
   alertThresholdSeconds: number
   alertAudioEnabled: boolean
   alertVisualEnabled: boolean
+  gazeStability: 'responsive' | 'balanced' | 'steady'
+  coachingHintsEnabled: boolean
 }
 
 export interface CameraDevice {
@@ -110,6 +112,7 @@ export interface HudState {
   sessionStartedAt: number | null
   speakerActive: boolean
   collapsed: boolean
+  hintsEnabled: boolean
 }
 
 export interface AlertPayload {

@@ -10,7 +10,7 @@ export interface Size {
 }
 export interface Rect extends Point, Size {}
 
-export const HUD_EXPANDED: Size = { width: 210, height: 96 }
+export const HUD_EXPANDED: Size = { width: 210, height: 118 }
 export const HUD_COLLAPSED: Size = { width: 32, height: 32 }
 export const HUD_MARGIN = 16
 

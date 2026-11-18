@@ -1,6 +1,8 @@
 import {
   GazeAccumulator,
+  OffCameraTimer,
   ZONES,
+  coachingHint,
   formatElapsed,
   gaugeDashOffset,
   type Zone
@@ -32,9 +34,22 @@ const gaugeText = el<HTMLSpanElement>('gauge-text')
 const zoneLabel = el<HTMLSpanElement>('zone-label')
 const timerEl = el<HTMLDivElement>('timer')
 const presenterEl = el<HTMLDivElement>('presenter')
+const hintEl = el<HTMLDivElement>('hint')
+const muteBtn = el<HTMLButtonElement>('mute')
+const muteSlash = el<SVGPathElement>('mute-slash')
+const muteWaves = el<SVGPathElement>('mute-waves')
 
 const accumulator = new GazeAccumulator()
-let state: HudState = { sessionStartedAt: null, speakerActive: false, collapsed: false }
+const offCamera = new OffCameraTimer()
+let offCameraSeconds = 0
+let alerting = false
+let muted = false // HUD-local override of the saved audio setting; resets with the HUD
+let state: HudState = {
+  sessionStartedAt: null,
+  speakerActive: false,
+  collapsed: false,
+  hintsEnabled: true
+}
 
 // ---- rendering -------------------------------------------------------------------------------
 
@@ -46,6 +61,24 @@ function renderGaze(): void {
   const percent = accumulator.cameraPercent
   gaugeText.textContent = percent === null ? '--' : `${Math.round(percent)}%`
   gaugeArc.style.strokeDashoffset = String(gaugeDashOffset(percent, GAUGE_CIRCUMFERENCE))
+  renderHint()
+}
+
+function renderHint(): void {
+  const hint = coachingHint(accumulator.currentZone, offCameraSeconds, alerting)
+  hintEl.hidden = !state.hintsEnabled
+  hintEl.textContent = hint.text
+  hintEl.dataset['level'] = hint.level
+  // Amber glow while nudging; the red pulse (alert) takes over after that.
+  hudEl.classList.toggle('nudge', state.hintsEnabled && hint.level === 'nudge' && !alerting)
+}
+
+function renderMute(): void {
+  muteBtn.setAttribute('aria-pressed', String(muted))
+  muteBtn.title = muted ? 'Unmute alert sound' : 'Mute alert sound'
+  muteBtn.setAttribute('aria-label', muteBtn.title)
+  muteSlash.setAttribute('visibility', muted ? 'visible' : 'hidden')
+  muteWaves.setAttribute('visibility', muted ? 'hidden' : 'visible')
 }
 
 function renderTimer(): void {
@@ -64,11 +97,15 @@ function renderState(): void {
 function applyState(next: HudState): void {
   if (next.sessionStartedAt !== state.sessionStartedAt) {
     accumulator.reset() // a new session starts from a clean gauge
-    renderGaze()
+    offCamera.reset()
+    offCameraSeconds = 0
     clearAlert()
+    renderGaze()
+    renderMute()
   }
   state = next
   renderState()
+  renderHint()
 }
 
 // ---- gaze feed -------------------------------------------------------------------------------
@@ -77,7 +114,9 @@ window.gazeTracker.onUpdate((event) => {
   // The payload crossed an IPC boundary; accept only what the model understands.
   if (!event || typeof event.ts !== 'number' || !ZONES.includes(event.zone)) return
   accumulator.add({ ts: event.ts, zone: event.zone })
+  offCameraSeconds = offCamera.update(event.ts, event.zone)
   renderGaze()
+  renderMute()
 })
 
 setInterval(renderTimer, 500)
@@ -141,6 +180,10 @@ function attachDrag(handle: HTMLElement, onClick?: () => void): void {
 attachDrag(gripEl)
 attachDrag(miniEl, () => window.hud.setCollapsed(false))
 collapseBtn.addEventListener('click', () => window.hud.setCollapsed(true))
+muteBtn.addEventListener('click', () => {
+  muted = !muted
+  renderMute()
+})
 
 // ---- alerts ----------------------------------------------------------------------------------
 
@@ -171,12 +214,16 @@ async function playPing(): Promise<void> {
 }
 
 function clearAlert(): void {
+  alerting = false
   hudEl.classList.remove('alert')
+  renderHint()
 }
 
 window.hud.onAlertFire((payload: AlertPayload) => {
+  alerting = true
   if (payload?.visual === true) hudEl.classList.add('alert')
-  if (payload?.audio === true) void playPing()
+  if (payload?.audio === true && !muted) void playPing()
+  renderHint()
 })
 window.hud.onAlertReset(clearAlert)
 
@@ -185,3 +232,4 @@ window.hud.onAlertReset(clearAlert)
 window.hud.onState(applyState)
 void window.hud.getState().then(applyState)
 renderGaze()
+renderMute()

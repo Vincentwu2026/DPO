@@ -38,7 +38,10 @@ out({
     { index: 1, name: 'Second Cam' }
   ]
 })
-out({ type: 'error', message: `started on camera ${cameraIndex}` })
+out({
+  type: 'error',
+  message: `started on camera ${cameraIndex} stability ${arg('--stability') ?? 'none'}`
+})
 
 const timer = setInterval(() => {
   if (mode === 'noisy') {
@@ -54,6 +57,8 @@ createInterface({ input: process.stdin }).on('line', (line) => {
   try {
     const cmd = JSON.parse(line)
     if (cmd.cmd === 'set_camera') out({ type: 'error', message: `camera set to ${cmd.index}` })
+    if (cmd.cmd === 'set_stability')
+      out({ type: 'error', message: `stability set to ${cmd.preset}` })
   } catch {
     // ignore
   }

@@ -21,6 +21,8 @@ export interface HudState {
   sessionStartedAt: number | null
   speakerActive: boolean
   collapsed: boolean
+  /** Show the real-time coaching line. */
+  hintsEnabled: boolean
 }
 
 export interface AlertPayload {
@@ -29,6 +31,7 @@ export interface AlertPayload {
 }
 
 export interface HudWindowOptions {
+  hintsEnabled: boolean
   prefs: HudPrefs
   preloadPath: string
   loadPage: (win: BrowserWindow) => void
@@ -48,9 +51,15 @@ const workAreas = () => screen.getAllDisplays().map((d) => d.workArea)
 export class HudWindow {
   private win: BrowserWindow | null = null
   private dragOrigin: Point | null = null
-  private state: HudState = { sessionStartedAt: null, speakerActive: false, collapsed: false }
+  private state: HudState
 
   constructor(private readonly options: HudWindowOptions) {
+    this.state = {
+      sessionStartedAt: null,
+      speakerActive: false,
+      collapsed: false,
+      hintsEnabled: options.hintsEnabled
+    }
     this.registerIpc()
   }
 
@@ -77,6 +86,12 @@ export class HudWindow {
   setSpeakerActive(active: boolean): void {
     if (this.state.speakerActive === active) return
     this.state.speakerActive = active
+    this.pushState()
+  }
+
+  setHintsEnabled(enabled: boolean): void {
+    if (this.state.hintsEnabled === enabled) return
+    this.state.hintsEnabled = enabled
     this.pushState()
   }
 

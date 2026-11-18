@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events'
 import { createInterface } from 'node:readline'
 import {
   isValidCameraIndex,
+  isValidStability,
   parseTrackerLine,
   type GazeEvent,
   type TrackerDevice,
@@ -51,6 +52,7 @@ export class TrackerProcess extends EventEmitter {
   private wanted = false
   private restarts = 0
   private cameraIndex = 0
+  private stability = 'balanced'
 
   constructor(options: TrackerProcessOptions) {
     super()
@@ -66,8 +68,9 @@ export class TrackerProcess extends EventEmitter {
     return this.wanted
   }
 
-  start(cameraIndex: number): void {
+  start(cameraIndex: number, stability?: string): void {
     if (!isValidCameraIndex(cameraIndex)) throw new RangeError('Invalid camera index')
+    if (stability !== undefined) this.setStability(stability)
     if (this.wanted) {
       this.setCamera(cameraIndex)
       return
@@ -85,6 +88,16 @@ export class TrackerProcess extends EventEmitter {
     const stdin = this.child?.stdin
     if (!stdin?.writable) return false
     stdin.write(`${JSON.stringify({ cmd: 'set_camera', index })}\n`)
+    return true
+  }
+
+  /** Change gaze smoothing without restarting; also used by the next automatic restart. */
+  setStability(preset: string): boolean {
+    if (!isValidStability(preset)) return false
+    this.stability = preset
+    const stdin = this.child?.stdin
+    if (!stdin?.writable) return false
+    stdin.write(`${JSON.stringify({ cmd: 'set_stability', preset })}\n`)
     return true
   }
 
@@ -115,7 +128,9 @@ export class TrackerProcess extends EventEmitter {
       child = this.spawnFn(this.launch.command, [
         ...this.launch.args,
         '--camera-index',
-        String(this.cameraIndex)
+        String(this.cameraIndex),
+        '--stability',
+        this.stability
       ])
     } catch {
       this.scheduleRestart()

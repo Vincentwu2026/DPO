@@ -30,6 +30,12 @@ export type TrackerMessage =
   | { type: 'devices'; list: TrackerDevice[] }
   | { type: 'error'; message: string }
 
+export const STABILITY_PRESETS = ['responsive', 'balanced', 'steady'] as const
+
+export function isValidStability(value: unknown): value is (typeof STABILITY_PRESETS)[number] {
+  return STABILITY_PRESETS.includes(value as (typeof STABILITY_PRESETS)[number])
+}
+
 export function isValidCameraIndex(value: unknown): value is number {
   return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= MAX_CAMERA_INDEX
 }

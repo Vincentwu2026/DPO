@@ -72,6 +72,19 @@
       <label><input id="alertVisualEnabled" type="checkbox" /> Visual alert</label>
     </fieldset>
 
+    <fieldset>
+      <legend>Real-time coaching</legend>
+      <label
+        ><input id="coachingHintsEnabled" type="checkbox" /> Show "look at the camera" hints</label
+      >
+      <label for="gazeStability">Gaze steadiness</label>
+      <select id="gazeStability" aria-label="Gaze steadiness">
+        <option value="responsive">Responsive (reacts fastest)</option>
+        <option value="balanced">Balanced</option>
+        <option value="steady">Steady (fewest flickers)</option>
+      </select>
+    </fieldset>
+
     <button id="save" type="button">Save</button>
     <button id="close" type="button">Close</button>
 
