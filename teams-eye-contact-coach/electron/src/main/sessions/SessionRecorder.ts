@@ -1,11 +1,11 @@
 import type { GazeEvent } from '../tracker/protocol'
-import type { MeetingMeta, NewSession } from './SessionRepository'
+import type { MeetingMeta, NewSession, StoredGazeEvent } from './SessionRepository'
 
 /** The slice of SessionRepository the recorder needs (lets tests use a fake). */
 export interface SessionStore {
   createSession(meta: NewSession): Promise<string>
   updateSessionMeeting(sessionId: string, meta: MeetingMeta): Promise<void>
-  insertGazeEvents(sessionId: string, events: readonly GazeEvent[]): Promise<void>
+  insertGazeEvents(sessionId: string, events: readonly StoredGazeEvent[]): Promise<void>
   closeSession(sessionId: string, endedAt?: number): Promise<void>
 }
 
@@ -18,7 +18,7 @@ export interface SessionRecorderOptions {
 export class SessionRecorder {
   private readonly flushIntervalMs: number
   private sessionId: string | null = null
-  private buffer: GazeEvent[] = []
+  private buffer: StoredGazeEvent[] = []
   private timer: NodeJS.Timeout | null = null
 
   constructor(
@@ -47,8 +47,9 @@ export class SessionRecorder {
     await this.store.updateSessionMeeting(this.sessionId, meta)
   }
 
-  record(event: GazeEvent): void {
-    if (this.sessionId) this.buffer.push(event)
+  /** `speaking`: whether the user is the active speaker at the moment of this event. */
+  record(event: GazeEvent, speaking = false): void {
+    if (this.sessionId) this.buffer.push({ ...event, speaking })
   }
 
   async flush(): Promise<void> {

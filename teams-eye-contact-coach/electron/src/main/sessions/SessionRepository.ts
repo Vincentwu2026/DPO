@@ -28,6 +28,8 @@ export interface StoredGazeEvent {
   ts: number
   zone: Zone
   confidence: number
+  /** True while the signed-in user was the active speaker (Graph, ~5 s resolution). */
+  speaking?: boolean
 }
 
 export interface ZoneStat {
@@ -37,13 +39,18 @@ export interface ZoneStat {
   events: number
 }
 
-export interface SessionSummary extends SessionMeta {
-  /** Wall-clock length (end − start; for an open session, up to the last event). */
-  durationSeconds: number
+export interface ZoneBreakdown {
   /** Time actually attributed to a zone (gaps over MAX_EVENT_GAP_S are not counted). */
   trackedSeconds: number
   zones: Record<Zone, ZoneStat>
   cameraPercent: number
+}
+
+export interface SessionSummary extends SessionMeta, ZoneBreakdown {
+  /** Wall-clock length (end − start; for an open session, up to the last event). */
+  durationSeconds: number
+  /** The same breakdown restricted to time the user was the active speaker. */
+  speaking: ZoneBreakdown
 }
 
 /** Append-only list: index i migrates schema version i → i+1. Never edit a released migration. */
@@ -66,6 +73,12 @@ const MIGRATIONS: ReadonlyArray<(db: Database.Database) => void> = [
         confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1)
       );
       CREATE INDEX idx_gaze_events_session_ts ON gaze_events (session_id, ts);
+    `),
+  // v2: tag each event with whether the user was speaking. Older events default to 0 (unknown).
+  (db) =>
+    db.exec(`
+      ALTER TABLE gaze_events
+        ADD COLUMN speaking INTEGER NOT NULL DEFAULT 0 CHECK (speaking IN (0, 1));
     `)
 ]
 
@@ -117,6 +130,24 @@ const toMeta = (r: SessionRow): SessionMeta => ({
 
 const nowSeconds = (): number => Date.now() / 1000
 
+function emptyBreakdown(): ZoneBreakdown {
+  return {
+    trackedSeconds: 0,
+    zones: Object.fromEntries(
+      ZONES.map((z) => [z, { seconds: 0, percent: 0, events: 0 }])
+    ) as Record<Zone, ZoneStat>,
+    cameraPercent: 0
+  }
+}
+
+function finishBreakdown(b: ZoneBreakdown): void {
+  b.trackedSeconds = ZONES.reduce((sum, z) => sum + b.zones[z].seconds, 0)
+  for (const z of ZONES) {
+    b.zones[z].percent = b.trackedSeconds > 0 ? (b.zones[z].seconds / b.trackedSeconds) * 100 : 0
+  }
+  b.cameraPercent = b.zones.camera.percent
+}
+
 /**
  * Local persistence for sessions and gaze events. better-sqlite3 is synchronous (fast enough for
  * ~30 Hz writes on the main process); the public API is async so the storage can change later.
@@ -163,10 +194,10 @@ export class SessionRepository {
   async insertGazeEvents(sessionId: string, events: readonly StoredGazeEvent[]): Promise<void> {
     if (events.length === 0) return
     const insert = this.db.prepare(
-      'INSERT INTO gaze_events (session_id, ts, zone, confidence) VALUES (?, ?, ?, ?)'
+      'INSERT INTO gaze_events (session_id, ts, zone, confidence, speaking) VALUES (?, ?, ?, ?, ?)'
     )
     this.db.transaction((batch: readonly StoredGazeEvent[]) => {
-      for (const e of batch) insert.run(sessionId, e.ts, e.zone, e.confidence)
+      for (const e of batch) insert.run(sessionId, e.ts, e.zone, e.confidence, e.speaking ? 1 : 0)
     })(events)
   }
 
@@ -193,26 +224,31 @@ export class SessionRepository {
     if (!row) return null
 
     // Each event lasts until the next one (capped); the final event contributes no time.
+    // An event's time counts toward "speaking" when the event itself was tagged speaking.
     const stats = this.db
       .prepare(
-        `SELECT zone, COUNT(*) AS events, COALESCE(SUM(dur), 0) AS seconds FROM (
-           SELECT zone, MIN(COALESCE(LEAD(ts) OVER (ORDER BY ts, id) - ts, 0), ?) AS dur
+        `SELECT zone, speaking, COUNT(*) AS events, COALESCE(SUM(dur), 0) AS seconds FROM (
+           SELECT zone, speaking, MIN(COALESCE(LEAD(ts) OVER (ORDER BY ts, id) - ts, 0), ?) AS dur
            FROM gaze_events WHERE session_id = ?
-         ) GROUP BY zone`
+         ) GROUP BY zone, speaking`
       )
-      .all(MAX_EVENT_GAP_S, sessionId) as { zone: Zone; events: number; seconds: number }[]
+      .all(MAX_EVENT_GAP_S, sessionId) as {
+      zone: Zone
+      speaking: 0 | 1
+      events: number
+      seconds: number
+    }[]
 
-    const zones = Object.fromEntries(
-      ZONES.map((z) => [z, { seconds: 0, percent: 0, events: 0 }])
-    ) as Record<Zone, ZoneStat>
+    const overall = emptyBreakdown()
+    const speaking = emptyBreakdown()
     for (const s of stats) {
-      zones[s.zone].seconds = s.seconds
-      zones[s.zone].events = s.events
+      for (const target of s.speaking === 1 ? [overall, speaking] : [overall]) {
+        target.zones[s.zone].seconds += s.seconds
+        target.zones[s.zone].events += s.events
+      }
     }
-    const trackedSeconds = ZONES.reduce((sum, z) => sum + zones[z].seconds, 0)
-    for (const z of ZONES) {
-      zones[z].percent = trackedSeconds > 0 ? (zones[z].seconds / trackedSeconds) * 100 : 0
-    }
+    finishBreakdown(overall)
+    finishBreakdown(speaking)
 
     let end = row.ended_at
     if (end === null) {
@@ -225,9 +261,8 @@ export class SessionRepository {
     return {
       ...toMeta(row),
       durationSeconds: Math.max(0, end - row.started_at),
-      trackedSeconds,
-      zones,
-      cameraPercent: zones.camera.percent
+      ...overall,
+      speaking
     }
   }
 

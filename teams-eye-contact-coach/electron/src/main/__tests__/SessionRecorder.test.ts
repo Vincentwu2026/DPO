@@ -1,15 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GazeEvent } from '../tracker/protocol'
 import { SessionRecorder, type SessionStore } from '../sessions/SessionRecorder'
+import type { StoredGazeEvent } from '../sessions/SessionRepository'
 
 const gaze = (ts: number): GazeEvent => ({ ts, zone: 'camera', confidence: 0.9 })
 
 function fakeStore() {
-  const written: { at: number; sessionId: string; events: GazeEvent[] }[] = []
+  const written: { at: number; sessionId: string; events: StoredGazeEvent[] }[] = []
   const store = {
     createSession: vi.fn().mockResolvedValue('s1'),
     updateSessionMeeting: vi.fn().mockResolvedValue(undefined),
-    insertGazeEvents: vi.fn(async (sessionId: string, events: readonly GazeEvent[]) => {
+    insertGazeEvents: vi.fn(async (sessionId: string, events: readonly StoredGazeEvent[]) => {
       written.push({ at: Date.now(), sessionId, events: [...events] })
     }),
     closeSession: vi.fn().mockResolvedValue(undefined)
@@ -31,7 +32,18 @@ describe('SessionRecorder', () => {
     await vi.advanceTimersByTimeAsync(499)
     expect(written.length).toBe(1)
     expect(written[0].at - t0).toBeLessThan(500)
-    expect(written[0].events).toEqual([gaze(1)])
+    expect(written[0].events).toEqual([{ ...gaze(1), speaking: false }])
+    await rec.end()
+  })
+
+  it('tags each event with whether the user was speaking when it was recorded', async () => {
+    const { store, written } = fakeStore()
+    const rec = new SessionRecorder(store)
+    await rec.begin({ trackingMode: 'both' })
+    rec.record(gaze(1), false)
+    rec.record(gaze(2), true)
+    await vi.advanceTimersByTimeAsync(250)
+    expect(written[0].events.map((e) => e.speaking)).toEqual([false, true])
     await rec.end()
   })
 

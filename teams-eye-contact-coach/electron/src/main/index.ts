@@ -43,6 +43,8 @@ let sessionStartedAt: number | null = null
 /** Resolves once the current session row exists, so late meeting metadata is never lost. */
 let sessionReady: Promise<unknown> = Promise.resolve()
 let cleanedUp = false
+/** True while Graph reports the signed-in user as the active speaker. */
+let speakerActive = false
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -114,7 +116,7 @@ function setupTracker(): void {
 
   tracker.on('gaze', (event) => {
     broadcast('gaze:update', event)
-    recorder?.record(event)
+    recorder?.record(event, speakerActive)
     handleAlert(event)
   })
   tracker.on('devices', (list) => broadcast('tracker:devices', list))
@@ -172,7 +174,7 @@ function beginSession(): void {
 
 function endSession(): void {
   sessionStartedAt = null
-  hud.setSpeakerActive(false)
+  setSpeaker(false)
   applyHud()
   const r = recorder
   if (r) sessionReady = sessionReady.then(() => r.end())
@@ -184,6 +186,11 @@ function startTracker(): void {
   } catch {
     broadcast('tracker:error', { message: 'The gaze tracker could not be started.', fatal: true })
   }
+}
+
+function setSpeaker(active: boolean): void {
+  speakerActive = active
+  hud.setSpeakerActive(active)
 }
 
 /** Connects call events (from MeetingService, or the dev fake call) to tracker, HUD and store. */
@@ -208,8 +215,8 @@ function bindCallEvents(source: EventEmitter): void {
       )
     }
   })
-  source.on('SPEAKER_ACTIVE', () => hud.setSpeakerActive(true))
-  source.on('SPEAKER_INACTIVE', () => hud.setSpeakerActive(false))
+  source.on('SPEAKER_ACTIVE', () => setSpeaker(true))
+  source.on('SPEAKER_INACTIVE', () => setSpeaker(false))
 }
 
 /** Meeting detection needs Azure AD + relay configuration; stays off until a user is signed in. */

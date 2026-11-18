@@ -160,6 +160,52 @@ describe('SessionRepository (in-memory SQLite)', () => {
   })
 })
 
+describe('speaking-time breakdown', () => {
+  let repo: SessionRepository
+
+  beforeEach(() => {
+    repo = new SessionRepository(new Database(':memory:'))
+  })
+
+  it('counts only events tagged speaking in the speaking breakdown', async () => {
+    const id = await repo.createSession({ trackingMode: 'both', startedAt: 0 })
+    // 0-4 s listening (screen), 4-8 s speaking: 3 s camera + 1 s screen, then one closing event.
+    await repo.insertGazeEvents(id, [
+      { ts: 0, zone: 'screen', confidence: 1, speaking: false },
+      { ts: 1, zone: 'screen', confidence: 1, speaking: false },
+      { ts: 2, zone: 'screen', confidence: 1, speaking: false },
+      { ts: 3, zone: 'screen', confidence: 1, speaking: false },
+      { ts: 4, zone: 'camera', confidence: 1, speaking: true },
+      { ts: 5, zone: 'camera', confidence: 1, speaking: true },
+      { ts: 6, zone: 'camera', confidence: 1, speaking: true },
+      { ts: 7, zone: 'screen', confidence: 1, speaking: true },
+      { ts: 8, zone: 'screen', confidence: 1, speaking: true }
+    ])
+    const s = (await repo.getSessionSummary(id))!
+
+    expect(s.speaking.trackedSeconds).toBeCloseTo(4)
+    expect(s.speaking.zones.camera.seconds).toBeCloseTo(3)
+    expect(s.speaking.zones.screen.seconds).toBeCloseTo(1)
+    expect(s.speaking.cameraPercent).toBeCloseTo(75)
+
+    // The overall numbers still cover the whole call, listening included.
+    expect(s.trackedSeconds).toBeCloseTo(8)
+    expect(s.cameraPercent).toBeCloseTo((3 / 8) * 100)
+  })
+
+  it('reports an empty speaking breakdown when the user never spoke', async () => {
+    const id = await repo.createSession({ trackingMode: 'both', startedAt: 0 })
+    await repo.insertGazeEvents(id, [
+      { ts: 0, zone: 'camera', confidence: 1 },
+      { ts: 1, zone: 'camera', confidence: 1 }
+    ])
+    const s = (await repo.getSessionSummary(id))!
+    expect(s.speaking.trackedSeconds).toBe(0)
+    expect(s.speaking.cameraPercent).toBe(0)
+    expect(s.cameraPercent).toBe(100)
+  })
+})
+
 describe('migrate', () => {
   it('is idempotent', () => {
     const db = new Database(':memory:')
@@ -176,6 +222,33 @@ describe('migrate', () => {
     migrate(db)
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION)
     db.prepare('SELECT * FROM sessions').all()
+  })
+
+  it('upgrades a v1 database with data and defaults old events to not speaking', () => {
+    const db = new Database(':memory:')
+    db.exec(`
+      CREATE TABLE sessions (
+        id TEXT PRIMARY KEY, meeting_id TEXT, subject TEXT,
+        tracking_mode TEXT NOT NULL CHECK (tracking_mode IN ('realtime', 'postcall', 'both')),
+        started_at REAL NOT NULL, ended_at REAL
+      );
+      CREATE TABLE gaze_events (
+        id INTEGER PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+        ts REAL NOT NULL,
+        zone TEXT NOT NULL CHECK (zone IN ('camera', 'screen', 'away')),
+        confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1)
+      );
+      INSERT INTO sessions VALUES ('old', NULL, 'Old call', 'both', 0, 10);
+      INSERT INTO gaze_events (session_id, ts, zone, confidence) VALUES ('old', 1, 'camera', 0.9);
+    `)
+    db.pragma('user_version = 1')
+
+    migrate(db)
+
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION)
+    expect(db.prepare('SELECT speaking FROM gaze_events').get()).toEqual({ speaking: 0 })
+    expect(db.prepare('SELECT subject FROM sessions').get()).toEqual({ subject: 'Old call' })
   })
 
   it('refuses a database written by a newer app version', () => {

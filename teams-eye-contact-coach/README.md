@@ -108,6 +108,13 @@ change is committed). Choose **Responsive**, **Balanced** (default) or **Steady*
 change applies live. On one real 15 s webcam recording the raw classifier flipped 2.3 times per
 second, Balanced 0.3 and Steady 0.07. Steadier presets also react more slowly to a real look-away.
 
+### Speaking time
+
+Every gaze event is stored with a `speaking` flag that is true while the signed-in user is the
+active speaker in Teams (Graph, polled every 5 s, so about 5 s resolution). All gaze is still
+recorded; session summaries carry an overall breakdown plus a `speaking` breakdown, which is what
+the cloud dashboard reports. Sessions recorded before this change count as not speaking.
+
 Known limits: Windows is untested, the zone thresholds are untuned, and the HUD has only been
 checked at 2x DPI on macOS.
 

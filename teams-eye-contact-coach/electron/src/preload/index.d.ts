@@ -95,11 +95,16 @@ export interface ZoneStat {
   events: number
 }
 
-export interface SessionSummary extends SessionMeta {
-  durationSeconds: number
+export interface ZoneBreakdown {
   trackedSeconds: number
   zones: Record<GazeZone, ZoneStat>
   cameraPercent: number
+}
+
+export interface SessionSummary extends SessionMeta, ZoneBreakdown {
+  durationSeconds: number
+  /** The same breakdown restricted to time the user was the active speaker. */
+  speaking: ZoneBreakdown
 }
 
 export interface SessionsApi {
