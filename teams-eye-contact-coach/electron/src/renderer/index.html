@@ -14,6 +14,64 @@
     <main>
       <h1>Teams Eye Contact Coach</h1>
 
+      <section
+        id="live"
+        class="live"
+        data-zone="none"
+        data-level="idle"
+        aria-label="Live eye contact"
+      >
+        <div class="live-top">
+          <div class="gauge" role="img" aria-label="Camera eye contact percentage">
+            <svg viewBox="0 0 64 64" width="132" height="132" aria-hidden="true">
+              <circle class="gauge-track" cx="32" cy="32" r="26" />
+              <circle
+                id="gauge-arc"
+                class="gauge-arc"
+                cx="32"
+                cy="32"
+                r="26"
+                transform="rotate(-90 32 32)"
+              />
+            </svg>
+            <span id="gauge-text" class="gauge-text">--</span>
+          </div>
+
+          <div class="live-info">
+            <div class="zone-row">
+              <span class="zone-dot" aria-hidden="true"></span>
+              <span id="zone-label" class="zone-label">Waiting</span>
+            </div>
+            <div id="timer" class="timer">0:00</div>
+            <div id="session-state" class="muted">No session running</div>
+          </div>
+        </div>
+
+        <div id="hint" class="hint" data-level="idle" role="status" aria-live="polite">
+          Start a session to begin tracking
+        </div>
+
+        <div class="breakdown" aria-label="Where you looked">
+          <div class="bar-row" data-zone="camera">
+            <span class="bar-label">Camera</span>
+            <span class="bar-track"><span id="bar-camera" class="bar-fill"></span></span>
+            <span id="pct-camera" class="bar-pct">--</span>
+          </div>
+          <div class="bar-row" data-zone="screen">
+            <span class="bar-label">Screen</span>
+            <span class="bar-track"><span id="bar-screen" class="bar-fill"></span></span>
+            <span id="pct-screen" class="bar-pct">--</span>
+          </div>
+          <div class="bar-row" data-zone="away">
+            <span class="bar-label">Away</span>
+            <span class="bar-track"><span id="bar-away" class="bar-fill"></span></span>
+            <span id="pct-away" class="bar-pct">--</span>
+          </div>
+        </div>
+
+        <button id="session-toggle" class="primary big" type="button">Start session</button>
+      </section>
+
       <section class="next" id="next" hidden>
         <h2>Next step</h2>
         <p id="next-text"></p>

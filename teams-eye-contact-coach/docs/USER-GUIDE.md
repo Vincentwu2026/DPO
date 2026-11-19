@@ -30,8 +30,11 @@ when you look away for too long, and keeps a history you can review later.
 2. When you join a Teams call, choose **Start Session** from the tray icon. The app switches on your
    webcam and starts tracking where you are looking. Choose **Stop Session** when the call ends.
 3. A small **HUD** appears in the top-right corner of your screen showing your eye-contact
-   percentage and whether you are looking at the camera, the screen, or away.
-4. If you look away from the camera for too long, the HUD flashes red and plays a soft ping.
+   percentage and whether you are looking at the camera, the screen, or away. The main window shows
+   the same live gauge, a timer, a coaching line and a camera / screen / away breakdown, with a big
+   **Start session / Stop session** button.
+4. If you look away from the camera for too long, the HUD and the main window flash red, and the HUD
+   plays a soft ping.
 5. When you leave the call the webcam turns off, the session is saved and a **report** window
    opens with your results. If your organisation has set up the cloud dashboard, the session is also
    uploaded so you can see trends over time.
@@ -42,7 +45,10 @@ when you look away for too long, and keeps a history you can review later.
   are never saved, recorded or sent anywhere.
 - **Only your own gaze is tracked**, on your own machine. The app does not watch other
   participants.
-- **The HUD is hidden from screen sharing**, so people in the meeting will not see it.
+- **Everything can be screen-shared.** The main window, report, calibration and settings windows,
+  and the floating HUD all appear in a screen share. To present or demo, share the main window
+  (or your whole screen) in Teams. If you want the HUD kept private, turn on **Hide the floating
+  HUD from screen shares** in Settings.
 - **What is stored on your computer:** a log of your gaze zone (camera, screen or away) over time
   for each call, plus the meeting subject.
 - **What is uploaded to the dashboard (only if set up):** just the time you were the **active
@@ -251,7 +257,7 @@ not part of those numbers.
 | The dot flickers between zones                  | Set **Gaze steadiness** to Steady.                                                                                                                                                   |
 | It says "look at the camera" while I am looking | Run **Calibrate Eye Contact…** from the tray menu. Also try Steady, and check your face is well lit.                                                                                 |
 | The alert sound is annoying                     | Click the speaker icon on the HUD to mute it for this call, or switch off **Audio alert** in Settings.                                                                               |
-| I cannot see the HUD in my screen share         | That is by design; the HUD is hidden from screen sharing.                                                                                                                            |
+| I cannot see the HUD in my screen share         | Open Settings and turn off **Hide the floating HUD from screen shares**. You can also share the main window, which shows the same live gauge.                                        |
 | The HUD is in the way                           | Drag it by the top grip, or collapse it to a dot.                                                                                                                                    |
 | My sessions are missing from the dashboard      | The upload may not be configured, may still be retrying, or you were not speaking. Restart the app to trigger a retry. Sessions recorded before cloud sync existed are not uploaded. |
 | Tracker could not start                         | Quit and restart the app. If it persists, report it to your admin.                                                                                                                   |

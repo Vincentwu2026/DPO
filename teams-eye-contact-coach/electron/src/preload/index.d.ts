@@ -11,6 +11,7 @@ export interface SettingsValues {
   alertVisualEnabled: boolean
   gazeStability: 'responsive' | 'balanced' | 'steady'
   coachingHintsEnabled: boolean
+  hudHiddenFromCapture: boolean
 }
 
 export interface CameraDevice {
@@ -126,8 +127,22 @@ export interface CalibrationApi {
   close(): Promise<void>
 }
 
+export interface LiveState {
+  active: boolean
+  /** Epoch ms when the running session began; null when none is running. */
+  startedAt: number | null
+  /** The saved tracking mode, so the panel can say what is being shown. */
+  trackingMode: SettingsValues['trackingMode']
+}
+
 export interface HomeApi {
   getStatus(): Promise<import('../shared/homeStatus').HomeStatus>
+  /** Whether a session is running, and when it started. */
+  getLiveState(): Promise<LiveState>
+  /** Starts a session if none is running, otherwise stops it. Resolves to the new state. */
+  toggleSession(): Promise<LiveState>
+  /** Pushed whenever a session starts or stops. */
+  onLiveState(cb: (state: LiveState) => void): Unsubscribe
   openCalibration(): Promise<void>
   openSettings(): Promise<void>
 }

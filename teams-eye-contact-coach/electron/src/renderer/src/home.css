@@ -121,3 +121,203 @@ button:disabled {
   margin-top: 18px;
   font-size: 12px;
 }
+
+/* ---- Live session panel (the part meant to be shared on screen) ---- */
+
+.live {
+  --zone: #6b7280;
+  --gauge-circumference: 163.363; /* 2 * PI * 26, keep in sync with main.ts */
+  margin: 18px 0 8px;
+  padding: 20px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: #0f172a;
+  color: #f1f5f9;
+}
+
+.live[data-zone='camera'] {
+  --zone: #22c55e;
+}
+.live[data-zone='screen'] {
+  --zone: #f59e0b;
+}
+.live[data-zone='away'] {
+  --zone: #ef4444;
+}
+
+.live-top {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.gauge {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  flex: none;
+}
+.gauge svg {
+  display: block;
+}
+.gauge-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-width: 6;
+}
+.gauge-arc {
+  fill: none;
+  stroke: var(--zone);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: var(--gauge-circumference);
+  stroke-dashoffset: var(--gauge-circumference);
+  transition:
+    stroke-dashoffset 0.4s ease,
+    stroke 0.25s ease;
+}
+.gauge-text {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.live-info {
+  min-width: 0;
+}
+.zone-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.zone-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--zone);
+  transition: background-color 0.25s ease;
+}
+.zone-label {
+  font-size: 22px;
+  font-weight: 600;
+}
+.timer {
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+  color: #e2e8f0;
+}
+.live .muted {
+  color: #94a3b8;
+}
+
+.hint {
+  margin: 16px 0 14px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.08);
+  color: #d1d5db;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+.hint[data-level='good'] {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+}
+.hint[data-level='nudge'] {
+  background: rgba(245, 158, 11, 0.9);
+  color: #1f1300;
+}
+.hint[data-level='alert'] {
+  background: rgba(239, 68, 68, 0.95);
+  color: #ffffff;
+}
+
+.breakdown {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.bar-row {
+  display: grid;
+  grid-template-columns: 64px 1fr 44px;
+  align-items: center;
+  gap: 10px;
+}
+.bar-label {
+  color: #cbd5e1;
+}
+.bar-track {
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.bar-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #6b7280;
+  transition: width 0.4s ease;
+}
+.bar-row[data-zone='camera'] .bar-fill {
+  background: #22c55e;
+}
+.bar-row[data-zone='screen'] .bar-fill {
+  background: #f59e0b;
+}
+.bar-row[data-zone='away'] .bar-fill {
+  background: #ef4444;
+}
+.bar-pct {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+button.big {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 16px;
+  font-weight: 600;
+}
+button.big.stop {
+  background: var(--bad);
+  border-color: var(--bad);
+}
+button.big.stop:hover {
+  background: #b83a3a;
+}
+
+/* Alert: red pulsing border, same cue as the floating HUD. */
+.live.alert {
+  border-color: #ef4444;
+  animation: live-pulse 1s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+  50% {
+    box-shadow: 0 0 18px 3px rgba(239, 68, 68, 0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live.alert {
+    animation: none;
+    box-shadow: 0 0 14px 3px rgba(239, 68, 68, 0.7);
+  }
+  .gauge-arc,
+  .zone-dot,
+  .bar-fill {
+    transition: none;
+  }
+}

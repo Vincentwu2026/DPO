@@ -88,8 +88,12 @@ closes. In development, `OPEN_CALIBRATION=1 npx electron-vite dev` opens the win
 
 ## HUD, alerts and session history
 
-While a Teams call is detected, the main process opens a small floating HUD (transparent,
-always-on-top, hidden from screen capture, click-through except its drag grip and collapse button).
+While a session is running, the main process opens a small floating HUD (transparent,
+always-on-top, click-through except its drag grip and collapse button). It is visible to screen
+capture by default so it can be demoed; the `hudHiddenFromCapture` setting turns on
+`setContentProtection`. The main window also shows a live panel (gauge, zone, timer, hint, zone
+breakdown, Start/Stop button, red pulse on alerts) built from the same `shared/hudModel.ts`, so the
+whole app can be shared on screen.
 It shows the camera eye-contact percentage, the current zone (green camera, amber screen, red away),
 a session timer and an "Active presenter" badge. Its position and collapsed state are remembered.
 The HUD and alerts run in the `realtime` and `both` tracking modes; in `postcall` mode the tracker

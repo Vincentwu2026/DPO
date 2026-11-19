@@ -26,6 +26,7 @@ import { resolveCameraIndex } from './tracker/resolveCamera'
 import { TrackerProcess } from './tracker/TrackerProcess'
 import { resolveTrackerLaunch } from './tracker/trackerLaunch'
 import { TrayService } from './tray/TrayService'
+import type { LiveState } from '../preload/index.d'
 
 const FORWARDED_EVENTS = {
   MEETING_STARTED: 'meeting:started',
@@ -72,8 +73,8 @@ function openHomeWindow(): void {
     return
   }
   const win = new BrowserWindow({
-    width: 520,
-    height: 480,
+    width: 560,
+    height: 820,
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -160,13 +161,21 @@ function handleAlert(event: { ts: number; zone: 'camera' | 'screen' | 'away' }):
   if (!liveFeedbackEnabled()) return
   const transition = alerts.update(event)
   if (transition === 'fire') {
-    hud.send('alert:fire', {
+    const payload = {
       visual: settings.getAlertVisualEnabled(),
       audio: settings.getAlertAudioEnabled()
-    })
+    }
+    hud.send('alert:fire', payload)
+    sendToHome('alert:fire', payload)
   } else if (transition === 'reset') {
     hud.send('alert:reset')
+    sendToHome('alert:reset')
   }
+}
+
+/** The main window mirrors the HUD's visual alert so it can be screen-shared on its own. */
+function sendToHome(channel: string, payload?: unknown): void {
+  if (homeWindow && !homeWindow.isDestroyed()) homeWindow.webContents.send(channel, payload)
 }
 
 /** Reconciles the HUD with the tracking mode and whether a call is in progress. */
@@ -184,12 +193,29 @@ function onSettingsChanged(): void {
   alerts.setThresholdSeconds(settings.getAlertThresholdSeconds())
   tracker.setStability(settings.getGazeStability())
   hud.setHintsEnabled(settings.getCoachingHintsEnabled())
+  hud.setHiddenFromCapture(settings.getHudHiddenFromCapture())
   applyHud()
+  pushLiveState()
+}
+
+function liveState(): LiveState {
+  return {
+    active: sessionStartedAt !== null,
+    startedAt: sessionStartedAt,
+    trackingMode: settings.getTrackingMode()
+  }
+}
+
+/** Tells the main window (the shareable live panel) that a session started or stopped. */
+function pushLiveState(): void {
+  if (homeWindow && !homeWindow.isDestroyed())
+    homeWindow.webContents.send('home:live-state', liveState())
 }
 
 function beginSession(): void {
   sessionStartedAt = Date.now()
   void tray?.refresh()
+  pushLiveState()
   alerts.startSession()
   if (recorder) {
     const r = recorder
@@ -208,6 +234,7 @@ function beginSession(): void {
 function endSession(showReport = false): void {
   sessionStartedAt = null
   void tray?.refresh()
+  pushLiveState()
   setSpeaker(false)
   applyHud()
   const r = recorder
@@ -393,6 +420,12 @@ function registerIpcHandlers(): void {
       calibrated: calibrationStore.getInfo() !== null
     })
   })
+  ipcMain.handle('home:get-live-state', () => liveState())
+  ipcMain.handle('home:toggle-session', async () => {
+    toggleManualSession()
+    await tray.refresh()
+    return liveState()
+  })
   ipcMain.handle('home:open-calibration', () => calibrationWindow.show())
   ipcMain.handle('home:open-settings', () => openSettingsWindow())
 
@@ -472,6 +505,7 @@ void app.whenReady().then(async () => {
   })
   hud = new HudWindow({
     hintsEnabled: settings.getCoachingHintsEnabled(),
+    hiddenFromCapture: settings.getHudHiddenFromCapture(),
     prefs: new HudPrefs(new Store({ name: 'hud' })),
     preloadPath: join(__dirname, '../preload/index.js'),
     loadPage: (win) => loadRenderer(win, 'hud/index.html'),

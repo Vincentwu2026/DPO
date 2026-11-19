@@ -75,6 +75,9 @@ const calibration = {
 // Status and shortcuts for the launch window. Nothing here exposes tokens or file paths.
 const home = {
   getStatus: () => ipcRenderer.invoke('home:get-status'),
+  getLiveState: () => ipcRenderer.invoke('home:get-live-state'),
+  toggleSession: () => ipcRenderer.invoke('home:toggle-session'),
+  onLiveState: (cb: (state: unknown) => void) => subscribeWithPayload('home:live-state', cb),
   openCalibration: () => ipcRenderer.invoke('home:open-calibration'),
   openSettings: () => ipcRenderer.invoke('home:open-settings')
 }

@@ -15,6 +15,8 @@ export interface Settings {
   gazeStability: Stability
   /** Show the real-time "look at the camera" coaching line on the HUD. */
   coachingHintsEnabled: boolean
+  /** Keep the floating HUD out of screen shares. Off by default so everything can be demoed. */
+  hudHiddenFromCapture: boolean
 }
 
 export type SettingsKey = keyof Settings
@@ -27,7 +29,8 @@ export const DEFAULT_SETTINGS: Settings = {
   alertAudioEnabled: true,
   alertVisualEnabled: true,
   gazeStability: 'balanced',
-  coachingHintsEnabled: true
+  coachingHintsEnabled: true,
+  hudHiddenFromCapture: false
 }
 
 const TRACKING_MODES: readonly TrackingMode[] = ['realtime', 'postcall', 'both']
@@ -44,7 +47,8 @@ const validators: { [K in SettingsKey]: (value: unknown) => value is Settings[K]
   alertAudioEnabled: (v): v is boolean => typeof v === 'boolean',
   alertVisualEnabled: (v): v is boolean => typeof v === 'boolean',
   gazeStability: (v): v is Stability => STABILITY_PRESETS.includes(v as Stability),
-  coachingHintsEnabled: (v): v is boolean => typeof v === 'boolean'
+  coachingHintsEnabled: (v): v is boolean => typeof v === 'boolean',
+  hudHiddenFromCapture: (v): v is boolean => typeof v === 'boolean'
 }
 
 export function isSettingsKey(key: unknown): key is SettingsKey {
@@ -78,7 +82,8 @@ export class SettingsService {
       alertAudioEnabled: this.get('alertAudioEnabled'),
       alertVisualEnabled: this.get('alertVisualEnabled'),
       gazeStability: this.get('gazeStability'),
-      coachingHintsEnabled: this.get('coachingHintsEnabled')
+      coachingHintsEnabled: this.get('coachingHintsEnabled'),
+      hudHiddenFromCapture: this.get('hudHiddenFromCapture')
     }
   }
 
@@ -127,5 +132,9 @@ export class SettingsService {
 
   getCoachingHintsEnabled(): boolean {
     return this.get('coachingHintsEnabled')
+  }
+
+  getHudHiddenFromCapture(): boolean {
+    return this.get('hudHiddenFromCapture')
   }
 }

@@ -45,6 +45,17 @@ export class GazeAccumulator {
     const total = this.trackedSeconds
     return total > 0 ? (this.seconds.camera / total) * 100 : null
   }
+
+  /** Share of tracked time per zone (each 0–100, summing to 100), or null before any tracking. */
+  get zonePercents(): Record<Zone, number> | null {
+    const total = this.trackedSeconds
+    if (total <= 0) return null
+    return {
+      camera: (this.seconds.camera / total) * 100,
+      screen: (this.seconds.screen / total) * 100,
+      away: (this.seconds.away / total) * 100
+    }
+  }
 }
 
 /** m:ss, or h:mm:ss from one hour; negative/NaN input renders as 0:00. */

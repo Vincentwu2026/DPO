@@ -42,6 +42,21 @@ describe('GazeAccumulator', () => {
     expect(acc.trackedSeconds).toBe(MAX_EVENT_GAP_S)
   })
 
+  it('reports the share of time in each zone, or null before any tracking', () => {
+    const acc = new GazeAccumulator()
+    expect(acc.zonePercents).toBeNull()
+    ;(
+      [
+        [0, 'camera'],
+        [1, 'screen'],
+        [2, 'screen'],
+        [3, 'away'],
+        [4, 'away']
+      ] as const
+    ).forEach(([ts, zone]) => acc.add({ ts, zone }))
+    expect(acc.zonePercents).toEqual({ camera: 25, screen: 50, away: 25 })
+  })
+
   it('reset clears everything', () => {
     const acc = new GazeAccumulator()
     acc.add({ ts: 0, zone: 'camera' })

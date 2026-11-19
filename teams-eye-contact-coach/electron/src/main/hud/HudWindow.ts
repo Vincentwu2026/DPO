@@ -32,6 +32,8 @@ export interface AlertPayload {
 
 export interface HudWindowOptions {
   hintsEnabled: boolean
+  /** Keep the HUD out of screen shares (content protection). Off by default so it can be demoed. */
+  hiddenFromCapture: boolean
   prefs: HudPrefs
   preloadPath: string
   loadPage: (win: BrowserWindow) => void
@@ -45,15 +47,17 @@ const workAreas = () => screen.getAllDisplays().map((d) => d.workArea)
 
 /**
  * The floating HUD: transparent, always on top, click-through except for its grip / collapse
- * controls, hidden from screen capture, and never focused. It exists only while shown.
- * All IPC handlers reject callers other than the HUD's own webContents.
+ * controls, and never focused. It can optionally be hidden from screen capture. It exists only
+ * while shown. All IPC handlers reject callers other than the HUD's own webContents.
  */
 export class HudWindow {
   private win: BrowserWindow | null = null
   private dragOrigin: Point | null = null
   private state: HudState
+  private hiddenFromCapture: boolean
 
   constructor(private readonly options: HudWindowOptions) {
+    this.hiddenFromCapture = options.hiddenFromCapture
     this.state = {
       sessionStartedAt: null,
       speakerActive: false,
@@ -87,6 +91,12 @@ export class HudWindow {
     if (this.state.speakerActive === active) return
     this.state.speakerActive = active
     this.pushState()
+  }
+
+  /** Applies at once to an open HUD, and to every HUD opened later. */
+  setHiddenFromCapture(hidden: boolean): void {
+    this.hiddenFromCapture = hidden
+    if (this.win && !this.win.isDestroyed()) this.win.setContentProtection(hidden)
   }
 
   setHintsEnabled(enabled: boolean): void {
@@ -136,7 +146,7 @@ export class HudWindow {
 
     win.setAlwaysOnTop(true, 'screen-saver')
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-    win.setContentProtection(true) // keep the HUD out of Teams screen-share capture
+    win.setContentProtection(this.hiddenFromCapture)
     win.setIgnoreMouseEvents(true, { forward: true }) // click-through until a control is hovered
 
     win.once('ready-to-show', () => {
