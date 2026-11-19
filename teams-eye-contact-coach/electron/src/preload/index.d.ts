@@ -143,6 +143,8 @@ export interface HomeApi {
   toggleSession(): Promise<LiveState>
   /** Pushed whenever a session starts or stops. */
   onLiveState(cb: (state: LiveState) => void): Unsubscribe
+  /** Asks main to fit the window to its content; main clamps the value. */
+  setContentHeight(height: number): void
   openCalibration(): Promise<void>
   openSettings(): Promise<void>
 }

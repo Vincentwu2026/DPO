@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, shell } from 'electron'
 import Store from 'electron-store'
 import { AlertEngine } from './alerts/AlertEngine'
 import { AuthService } from './auth/AuthService'
@@ -73,8 +73,9 @@ function openHomeWindow(): void {
     return
   }
   const win = new BrowserWindow({
-    width: 560,
-    height: 820,
+    width: 400,
+    height: 560,
+    minWidth: 360,
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -419,6 +420,13 @@ function registerIpcHandlers(): void {
       cloudConfigured: sync !== null,
       calibrated: calibrationStore.getInfo() !== null
     })
+  })
+  ipcMain.on('home:set-content-height', (event, height: unknown) => {
+    if (!homeWindow || homeWindow.isDestroyed() || event.sender !== homeWindow.webContents) return
+    if (typeof height !== 'number' || !Number.isFinite(height)) return
+    const [width] = homeWindow.getContentSize()
+    const maxHeight = screen.getPrimaryDisplay().workAreaSize.height - 80
+    homeWindow.setContentSize(width ?? 400, Math.round(Math.min(Math.max(height, 200), maxHeight)))
   })
   ipcMain.handle('home:get-live-state', () => liveState())
   ipcMain.handle('home:toggle-session', async () => {

@@ -151,3 +151,9 @@ $('settings').addEventListener('click', () => void window.home.openSettings())
 window.addEventListener('focus', () => void refresh())
 void refresh()
 renderGaze()
+
+// Fit the window to its content so it never has empty space or a scrollbar.
+const main = document.querySelector('main') as HTMLElement
+new ResizeObserver(() =>
+  window.home.setContentHeight(Math.ceil(main.getBoundingClientRect().height))
+).observe(main)

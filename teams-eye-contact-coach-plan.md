@@ -434,6 +434,91 @@ Show an in-app post-session report window immediately after a meeting ends, so t
 
 ---
 
+### Proposed Addition — Speech Coach (optional speech analysis in any live session)
+
+**Status:** [ ] planned, not started. The scope decisions are made (below); Phase 0 is a go/no-go spike.
+
+**Goal:** In any live session, the user can switch on speech analysis. The app transcribes their speech on the device and scores how **confident** and how **conversational** they sounded. The result appears in the **conclusion of the report**, next to the eye-contact results, and is then discarded.
+
+#### Decisions (from the product owner)
+
+| # | Decision |
+|---|---|
+| D1 | **Any live session**, not only rehearsals. Speech analysis is an option the user turns on; it is off by default. |
+| D2 | **Runs locally.** No audio or text leaves the computer, and there is no API key. |
+| D3 | **No transcript.** Text is never shown, kept or exported. |
+| D4 | **English only.** |
+| D5 | **Shown in the report's conclusion.** Delivery scores sit with the tips at the end of the report. |
+| D6 | **Nothing is stored.** Speech results exist only in memory while the report is open, and are not written to SQLite, not uploaded, and not in the PDF history. |
+
+Interpretation to confirm: D6 is applied to the **speech results only**. Gaze sessions keep being stored and synced exactly as today. If "no storing" should cover the whole report, say so, because the report currently reads from the session database.
+
+**Non-goals:** saving audio or text, judging what was said (accuracy, content), analysing other people, other languages, and any claim that the scores measure real confidence. They are coaching indicators built from visible rules.
+
+#### How it works
+
+```
+Microphone -> speech side-process (VAD + on-device Whisper)
+   | per phrase: {start, end, words[{w, start, end}]}
+   v
+Electron main: SpeechProcess -> SpeechAccumulator (counts only; the text is dropped at once)
+   |
+   | on Stop session: summary kept in memory under the session id
+   v
+Report window: Delivery section in the conclusion  ->  discarded when the report closes or the app quits
+```
+
+- **Text is discarded as it arrives.** The accumulator only keeps running tallies: word count, fillers, hedges, contractions, "you/your", questions, sentence lengths, pause lengths, and words per 15-second bucket. Because the words are never kept, D3 and D6 are structural rather than a setting. Leaving no transcript is also what allows a privacy statement that is short and true.
+- **Side-process:** a second Python process built like the gaze tracker (own JSON-lines protocol, own PyInstaller bundle, same spawn and restart pattern as `TrackerProcess`). Audio stays in memory and is dropped after each phrase is transcribed.
+- **Engine candidate:** `faster-whisper` `base.en`, int8 (about 75 MB), with voice-activity detection to split phrases, so results arrive 1 to 3 s after each phrase. Alternatives for Phase 0: `whisper.cpp`, and Vosk (smaller, keeps filler words better, less accurate).
+- **Join with gaze:** phrases use the same epoch-second clock as gaze events. Only the per-bucket word counts are needed for reading detection, and they are computed from the gaze events already in the database.
+- **Switching on and off:** a "Analyse my speech" switch next to Start/Stop in the main window, and a tray item. It can be switched on or off during a session. The report states how much of the session was analysed ("12 of 30 minutes") and is hidden if less than about 30 seconds of speech was captured.
+- **Live view:** only a "Listening" indicator in the main window and tray (consent and clarity). No live scores in v1, since the user asked for results in the report.
+
+#### Scoring (transparent rules, no black box)
+
+Each score is a weighted sum of visible components. The report shows each component's value and the rule behind it.
+
+| Signal | Measure | Feeds |
+|---|---|---|
+| Filler words | um, uh, "like", "you know", "basically" per minute | Confidence |
+| Hedging | "I think", "maybe", "kind of", "just", "sorry", "I guess" per 100 words | Confidence |
+| Pace | words per minute; healthy band about 130 to 170 | Both |
+| Pauses | count of pauses over 2 s; variation in pace between phrases | Confidence |
+| Sentence length | average words per sentence | Conversational |
+| Contractions | "don't" vs "do not" | Conversational |
+| Audience focus | "you / your" share and questions per minute | Conversational |
+| Formality | long-word share and a readability grade | Conversational |
+| **Reading detection** | high screen-gaze % **and** very even pace **and** almost no fillers | Conversational (flag: "sounded scripted") |
+
+Reading detection is the strongest reason to build this in this app: no speech-only tool also has the gaze data.
+
+Output: two 0 to 100 scores, up to three delivery tips in the style of `generateTips`, a pace-over-time strip, and a note on how much of the session was analysed.
+
+#### Phases
+
+| Phase | Work | Done when |
+|---|---|---|
+| **0. Spike** (1 to 2 days) | Benchmark engines on this Mac with the gaze tracker running: latency, CPU, accuracy on 5 recorded sessions, how many fillers are kept, bundle size. **Also test a real Teams call:** whether mic capture works alongside Teams, and how much of other people's audio from the speakers is picked up. | **Go/no-go:** under 3 s latency, the tracker still near real time, fillers mostly kept, added bundle at most about 150 MB, and echo manageable |
+| **1. Speech process** | `python/speech/` with the protocol, mic selection, VAD, WAV fixtures, pytest | Phrases and word timings emitted for a WAV file and a live mic |
+| **2. Scoring model** | `shared/speechModel.ts`: lexicons, `SpeechAccumulator`, scores and tips, with unit tests per rule and for edge cases (silence, very short, no words) | Pure functions, no I/O, tests pass |
+| **3. Wiring** | `SpeechProcess` in main, the in-memory summary store keyed by session id, the switch (main window and tray), mic permission handling, "Listening" indicator, a mic device setting | Session with analysis on gives a summary at Stop; nothing written to disk |
+| **4. Report** | Delivery section in the conclusion of the report (scores, component bars, tips, analysed-time note) and in the PDF export; hidden when there is not enough speech | Report shows both parts, and a restart shows no speech data |
+| **5. Packaging and privacy** | `NSMicrophoneUsageDescription` and the `com.apple.security.device.audio-input` entitlement on macOS; rebuild the DMG; update the USER-GUIDE privacy section (today it only mentions video); bundle the model | Packaged app asks for the mic and works |
+| **6. Optional later** | Volume and pitch variation (monotone check), other languages | Separate decision |
+
+#### Risks
+
+- **Echo in live calls (new with D1).** On speakers, the other participants' voices can be transcribed as the user's, which would corrupt every score. Phase 0 measures it. Mitigations: a "use headphones" hint, a level gate so only the near-field voice counts, and a warning if the mic hears sustained audio at the same time as the Teams output. If it cannot be made reliable, fall back to D1 = rehearsal only.
+- **Mic sharing with Teams.** macOS normally allows two apps to read the mic, but this must be proven on a real call, not assumed.
+- **Whisper tends to drop "um" and "uh".** That under-counts fillers, the signal sellers most want. Phase 0 measures it. Mitigations: a priming prompt that contains fillers, or Vosk.
+- **Score validity.** There is no ground truth for "confident". Tune the weights on 10 to 20 labelled sessions, and label the output as coaching indicators.
+- **CPU load.** MediaPipe plus Whisper together may slow gaze tracking on older machines. Phase 0 checks this.
+- **Installer size.** The DMG is 243 MB today; expect roughly 100 to 250 MB more.
+- **Consent.** The switch is off by default, the permission prompt is explicit, and the "Listening" indicator is always visible while on. Recording a call that includes other people may need their awareness under your organisation's policy, even though nothing is kept.
+
+---
+
 ## Implementation Order
 
 ```

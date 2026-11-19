@@ -78,6 +78,7 @@ const home = {
   getLiveState: () => ipcRenderer.invoke('home:get-live-state'),
   toggleSession: () => ipcRenderer.invoke('home:toggle-session'),
   onLiveState: (cb: (state: unknown) => void) => subscribeWithPayload('home:live-state', cb),
+  setContentHeight: (height: number) => ipcRenderer.send('home:set-content-height', height),
   openCalibration: () => ipcRenderer.invoke('home:open-calibration'),
   openSettings: () => ipcRenderer.invoke('home:open-settings')
 }

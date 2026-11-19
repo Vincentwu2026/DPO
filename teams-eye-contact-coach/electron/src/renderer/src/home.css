@@ -24,12 +24,12 @@ body {
 }
 
 main {
-  padding: 28px;
+  padding: 14px 16px;
 }
 
 h1 {
-  font-size: 20px;
-  margin: 0 0 2px;
+  font-size: 15px;
+  margin: 0;
 }
 
 h2 {
@@ -46,8 +46,8 @@ h2 {
 }
 
 .next {
-  margin: 18px 0 4px;
-  padding: 12px 14px;
+  margin: 10px 0 4px;
+  padding: 8px 10px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
@@ -60,15 +60,16 @@ h2 {
 
 .status {
   list-style: none;
-  margin: 18px 0;
+  margin: 8px 0;
   padding: 0;
 }
 
 .status li {
   display: grid;
-  grid-template-columns: 90px 1fr;
-  gap: 12px;
-  padding: 8px 0;
+  grid-template-columns: 76px 1fr;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 13px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -114,12 +115,12 @@ button:disabled {
 .error {
   color: var(--bad);
   min-height: 1.5em;
-  margin: 10px 0 0;
+  margin: 4px 0 0;
 }
 
 .foot {
-  margin-top: 18px;
-  font-size: 12px;
+  margin-top: 6px;
+  font-size: 11px;
 }
 
 /* ---- Live session panel (the part meant to be shared on screen) ---- */
@@ -127,10 +128,10 @@ button:disabled {
 .live {
   --zone: #6b7280;
   --gauge-circumference: 163.363; /* 2 * PI * 26, keep in sync with main.ts */
-  margin: 18px 0 8px;
-  padding: 20px;
+  margin: 8px 0;
+  padding: 12px;
   border: 2px solid var(--border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: #0f172a;
   color: #f1f5f9;
 }
@@ -148,13 +149,13 @@ button:disabled {
 .live-top {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 14px;
 }
 
 .gauge {
   position: relative;
-  width: 132px;
-  height: 132px;
+  width: 84px;
+  height: 84px;
   flex: none;
 }
 .gauge svg {
@@ -181,7 +182,7 @@ button:disabled {
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 30px;
+  font-size: 20px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -195,18 +196,18 @@ button:disabled {
   gap: 8px;
 }
 .zone-dot {
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: var(--zone);
   transition: background-color 0.25s ease;
 }
 .zone-label {
-  font-size: 22px;
+  font-size: 17px;
   font-weight: 600;
 }
 .timer {
-  font-size: 28px;
+  font-size: 20px;
   font-variant-numeric: tabular-nums;
   color: #e2e8f0;
 }
@@ -215,10 +216,10 @@ button:disabled {
 }
 
 .hint {
-  margin: 16px 0 14px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 16px;
+  margin: 10px 0 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 13px;
   font-weight: 600;
   text-align: center;
   background: rgba(255, 255, 255, 0.08);
@@ -242,21 +243,22 @@ button:disabled {
 
 .breakdown {
   display: grid;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 4px;
+  margin-bottom: 10px;
+  font-size: 12px;
 }
 .bar-row {
   display: grid;
-  grid-template-columns: 64px 1fr 44px;
+  grid-template-columns: 48px 1fr 36px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 .bar-label {
   color: #cbd5e1;
 }
 .bar-track {
-  height: 10px;
-  border-radius: 5px;
+  height: 7px;
+  border-radius: 4px;
   background: rgba(255, 255, 255, 0.12);
   overflow: hidden;
 }
@@ -283,8 +285,8 @@ button:disabled {
 
 button.big {
   width: 100%;
-  padding: 12px 14px;
-  font-size: 16px;
+  padding: 8px 12px;
+  font-size: 14px;
   font-weight: 600;
 }
 button.big.stop {
