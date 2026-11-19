@@ -68,3 +68,125 @@ describe('isValidCameraIndex', () => {
     expect(isValidCameraIndex(v)).toBe(false)
   )
 })
+
+describe('parseTrackerLine calibration messages', () => {
+  const update = {
+    type: 'calibration',
+    face: true,
+    h: 0.51,
+    v: 0.01,
+    yaw: 2,
+    pitch: -1,
+    zone: 'camera',
+    phase: 'camera',
+    camera_samples: 12,
+    screen_samples: 0,
+    preview: 'QUJD'
+  }
+  const thresholds = {
+    h_center: 0.5,
+    h_tolerance: 0.08,
+    v_center: 0,
+    v_tolerance: 0.05,
+    yaw_center: 0,
+    pitch_center: 0,
+    camera_max_yaw: 15,
+    camera_max_pitch: 15,
+    away_yaw: 40,
+    away_pitch: 35
+  }
+  const result = {
+    type: 'calibration_result',
+    ok: true,
+    good: true,
+    camera_samples: 40,
+    screen_samples: 41,
+    camera_hit: 0.97,
+    screen_hit: 0.9,
+    thresholds
+  }
+  const parse = (o: unknown): ReturnType<typeof parseTrackerLine> =>
+    parseTrackerLine(JSON.stringify(o))
+
+  it('parses a live update into camelCase', () => {
+    expect(parse(update)).toEqual({
+      type: 'calibration',
+      face: true,
+      h: 0.51,
+      v: 0.01,
+      yaw: 2,
+      pitch: -1,
+      zone: 'camera',
+      phase: 'camera',
+      cameraSamples: 12,
+      screenSamples: 0,
+      preview: 'QUJD'
+    })
+  })
+
+  it('accepts no face, no phase and no preview', () => {
+    const msg = parse({
+      ...update,
+      face: false,
+      h: null,
+      v: null,
+      yaw: null,
+      pitch: null,
+      phase: null,
+      preview: null
+    })
+    expect(msg).toMatchObject({
+      type: 'calibration',
+      face: false,
+      h: null,
+      phase: null,
+      preview: null
+    })
+  })
+
+  it.each([
+    ['face is not a boolean', { face: 1 }],
+    ['unknown zone', { zone: 'sideways' }],
+    ['unknown phase', { phase: 'up' }],
+    ['non-finite reading', { h: 'x' }],
+    ['absurd reading', { yaw: 1e9 }],
+    ['negative count', { camera_samples: -1 }],
+    ['fractional count', { screen_samples: 1.5 }],
+    ['preview that is not base64', { preview: '<script>alert(1)</script>' }],
+    ['oversized preview', { preview: 'A'.repeat(200_001) }]
+  ])('rejects an update where %s', (_name, patch) => {
+    expect(parse({ ...update, ...patch })).toBeNull()
+  })
+
+  it('parses a fit result', () => {
+    expect(parse(result)).toEqual({
+      type: 'calibration_result',
+      result: {
+        good: true,
+        cameraSamples: 40,
+        screenSamples: 41,
+        cameraHit: 0.97,
+        screenHit: 0.9,
+        thresholds
+      }
+    })
+  })
+
+  it('parses a "not enough data" result', () => {
+    expect(parse({ type: 'calibration_result', ok: false })).toEqual({
+      type: 'calibration_result',
+      result: null
+    })
+  })
+
+  it.each([
+    ['out-of-range threshold', { thresholds: { ...thresholds, h_center: 9 } }],
+    ['missing threshold', { thresholds: { h_center: 0.5 } }],
+    ['overlapping away zone', { thresholds: { ...thresholds, away_yaw: 16 } }],
+    ['hit rate above 1', { camera_hit: 1.5 }],
+    ['non-boolean good', { good: 'yes' }],
+    ['unknown ok', { ok: 'maybe' }]
+  ])('rejects a result with %s', (_name, patch) => {
+    expect(parse({ ...result, ...patch })).toBeNull()
+  })
+})

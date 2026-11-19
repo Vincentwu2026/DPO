@@ -6,6 +6,18 @@ import type { GazeEvent, TrackerDevice, TrackerError } from '../tracker/protocol
 import { defaultSpawn, TrackerProcess } from '../tracker/TrackerProcess'
 
 const MOCK = join(__dirname, 'fixtures', 'mock-tracker.mjs')
+const DEFAULT_THRESHOLDS = {
+  h_center: 0.5,
+  h_tolerance: 0.08,
+  v_center: 0,
+  v_tolerance: 0.05,
+  yaw_center: 0,
+  pitch_center: 0,
+  camera_max_yaw: 15,
+  camera_max_pitch: 15,
+  away_yaw: 40,
+  away_pitch: 35
+}
 
 function launch(...extra: string[]) {
   return { command: process.execPath, args: [MOCK, ...extra] }
@@ -92,6 +104,57 @@ describe('TrackerProcess (integration with a mock tracker process)', () => {
     expect(tracker.setStability('responsive')).toBe(true)
     expect((await ack).message).toBe('stability set to responsive')
     expect(tracker.setStability('extreme')).toBe(false)
+  })
+
+  it('sends calibration commands and emits the fit result', async () => {
+    const tracker = make()
+    const ready = waitFor(tracker, 'gaze')
+    tracker.start(0)
+    await ready
+
+    const started = waitFor<TrackerError>(
+      tracker,
+      'tracker-error',
+      (e) => e.message === 'calibration started'
+    )
+    expect(tracker.calibrationStart()).toBe(true)
+    await started
+
+    const phase = waitFor<TrackerError>(
+      tracker,
+      'tracker-error',
+      (e) => e.message === 'phase screen'
+    )
+    expect(tracker.calibrationPhase('screen')).toBe(true)
+    await phase
+
+    const fit = waitFor<unknown>(tracker, 'calibration-result')
+    expect(tracker.calibrationFit()).toBe(true)
+    expect(await fit).toBeNull()
+    expect(tracker.calibrationStop()).toBe(true)
+  })
+
+  it('calibration commands return false when the tracker is not running', () => {
+    const tracker = make()
+    expect(tracker.calibrationStart()).toBe(false)
+    expect(tracker.calibrationFit()).toBe(false)
+  })
+
+  it('setThresholds validates, and re-sends the saved thresholds after a restart', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracker-test-'))
+    tempDirs.push(dir)
+    const tracker = make(['--mode', 'crash-once', '--marker', join(dir, 'marker')])
+    const good = { ...DEFAULT_THRESHOLDS, h_center: 0.56 }
+    expect(tracker.setThresholds({ ...good, h_center: 9 })).toBe(false)
+    expect(tracker.setThresholds(good)).toBe(false) // remembered, but nothing running yet
+    const applied = waitFor<TrackerError>(
+      tracker,
+      'tracker-error',
+      (e) => e.message === 'thresholds 0.56'
+    )
+    tracker.start(0)
+    await applied
+    expect(tracker.setThresholds(null)).toBe(true)
   })
 
   it('setCamera writes a set_camera command to stdin without restarting', async () => {

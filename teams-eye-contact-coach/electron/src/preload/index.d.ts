@@ -10,6 +10,7 @@ export interface SignedInUser {
 export interface SettingsValues {
   trackingMode: 'realtime' | 'postcall' | 'both'
   cameraIndex: number
+  cameraAuto: boolean
   alertThresholdSeconds: number
   alertAudioEnabled: boolean
   alertVisualEnabled: boolean
@@ -112,6 +113,36 @@ export interface SessionsApi {
   getSummary(sessionId: string): Promise<SessionSummary | null>
 }
 
+export interface ReportApi {
+  /** The report for the session main opened this window for; null if unavailable. */
+  get(): Promise<import('../shared/reportModel').ReportData | null>
+  exportPdf(): Promise<{ ok: true; fileName: string } | { ok: false }>
+  /** Opens the cloud dashboard in the default browser; false if none is configured. */
+  openHistory(): Promise<boolean>
+  close(): Promise<void>
+}
+
+export interface CalibrationApi {
+  /** Live reading (about 10 per second) while the window is open. */
+  onUpdate(cb: (update: import('../main/tracker/protocol').CalibrationUpdate) => void): Unsubscribe
+  /** Which look is being sampled; null pauses sampling. */
+  setPhase(phase: 'camera' | 'screen' | null): Promise<boolean>
+  /** Fits personal thresholds from the two looks; null if there was not enough face data. */
+  fit(): Promise<import('../shared/calibrationModel').CalibrationFitStats | null>
+  /** Saves the last good fit and starts using it. */
+  apply(): Promise<boolean>
+  /** Forgets the personal calibration and goes back to the built-in defaults. */
+  reset(): Promise<void>
+  getInfo(): Promise<{ calibratedAt: number } | null>
+  close(): Promise<void>
+}
+
+export interface HomeApi {
+  getStatus(): Promise<import('../shared/homeStatus').HomeStatus>
+  openCalibration(): Promise<void>
+  openSettings(): Promise<void>
+}
+
 export interface HudState {
   /** Epoch ms when the current session started; null while no session is open. */
   sessionStartedAt: number | null
@@ -149,6 +180,9 @@ declare global {
     meeting: MeetingApi
     gazeTracker: GazeTrackerApi
     hud: HudApi
+    home: HomeApi
+    report: ReportApi
+    calibration: CalibrationApi
     sessions: SessionsApi
   }
 }

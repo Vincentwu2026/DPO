@@ -5,10 +5,14 @@ import {
   isValidCameraIndex,
   isValidStability,
   parseTrackerLine,
+  type CalibrationFit,
+  type CalibrationPhase,
+  type CalibrationUpdate,
   type GazeEvent,
   type TrackerDevice,
   type TrackerError
 } from './protocol'
+import { parseThresholds, type GazeThresholds } from './thresholds'
 
 export interface TrackerLaunch {
   command: string
@@ -37,7 +41,8 @@ export const defaultSpawn: SpawnFn = (command, args) =>
  * Owns the Python gaze-tracker child process: spawns it, parses its stdout into typed events,
  * forwards stdin commands and restarts it with exponential back-off if it dies unexpectedly.
  *
- * Events: `gaze` (GazeEvent), `devices` (TrackerDevice[]), `tracker-error` (TrackerError).
+ * Events: `gaze` (GazeEvent), `devices` (TrackerDevice[]), `tracker-error` (TrackerError),
+ * `calibration` (CalibrationUpdate) and `calibration-result` (CalibrationFit | null).
  */
 export class TrackerProcess extends EventEmitter {
   private readonly launch: TrackerLaunch
@@ -53,6 +58,7 @@ export class TrackerProcess extends EventEmitter {
   private restarts = 0
   private cameraIndex = 0
   private stability = 'balanced'
+  private thresholds: GazeThresholds | null = null
 
   constructor(options: TrackerProcessOptions) {
     super()
@@ -98,6 +104,43 @@ export class TrackerProcess extends EventEmitter {
     const stdin = this.child?.stdin
     if (!stdin?.writable) return false
     stdin.write(`${JSON.stringify({ cmd: 'set_stability', preset })}\n`)
+    return true
+  }
+
+  /**
+   * Use personal zone thresholds (null = the built-in defaults). Remembered, and re-sent when the
+   * tracker is restarted. Returns false if they are invalid or could not be delivered right now.
+   */
+  setThresholds(thresholds: GazeThresholds | null): boolean {
+    const clean = thresholds === null ? null : parseThresholds(thresholds)
+    if (thresholds !== null && !clean) return false
+    this.thresholds = clean
+    return this.send({ cmd: 'set_thresholds', thresholds: clean })
+  }
+
+  /** Start streaming live readings and previews (only while the calibration window is open). */
+  calibrationStart(): boolean {
+    return this.send({ cmd: 'calibration_start' })
+  }
+
+  calibrationStop(): boolean {
+    return this.send({ cmd: 'calibration_stop' })
+  }
+
+  /** Which look is being sampled; null pauses sampling between steps. */
+  calibrationPhase(phase: CalibrationPhase | null): boolean {
+    return this.send({ cmd: 'calibration_phase', phase })
+  }
+
+  /** Ask for a fit; the answer arrives as a `calibration-result` event. */
+  calibrationFit(): boolean {
+    return this.send({ cmd: 'calibration_fit' })
+  }
+
+  private send(command: Record<string, unknown>): boolean {
+    const stdin = this.child?.stdin
+    if (!stdin?.writable) return false
+    stdin.write(`${JSON.stringify(command)}\n`)
     return true
   }
 
@@ -149,6 +192,7 @@ export class TrackerProcess extends EventEmitter {
     const lines = child.stdout ? createInterface({ input: child.stdout }) : null
     lines?.on('line', (line) => this.handleLine(child, line))
     child.stdin?.on('error', () => undefined) // EPIPE if the child dies mid-write
+    if (this.thresholds) this.send({ cmd: 'set_thresholds', thresholds: this.thresholds })
 
     let ended = false
     const onEnd = (): void => {
@@ -185,6 +229,23 @@ export class TrackerProcess extends EventEmitter {
           message: message.message,
           fatal: false
         } satisfies TrackerError)
+        break
+      case 'calibration':
+        this.emit('calibration', {
+          face: message.face,
+          h: message.h,
+          v: message.v,
+          yaw: message.yaw,
+          pitch: message.pitch,
+          zone: message.zone,
+          phase: message.phase,
+          cameraSamples: message.cameraSamples,
+          screenSamples: message.screenSamples,
+          preview: message.preview
+        } satisfies CalibrationUpdate)
+        break
+      case 'calibration_result':
+        this.emit('calibration-result', message.result satisfies CalibrationFit | null)
         break
       case 'ready':
         break

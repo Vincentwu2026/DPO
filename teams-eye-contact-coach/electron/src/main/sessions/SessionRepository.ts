@@ -306,6 +306,14 @@ export class SessionRepository {
     }
   }
 
+  /** Events of one session for the report timeline; empty if the session does not exist. */
+  async getReportEvents(sessionId: string): Promise<SyncSource['events']> {
+    const events = this.db
+      .prepare('SELECT ts, zone, speaking FROM gaze_events WHERE session_id = ? ORDER BY ts, id')
+      .all(sessionId) as { ts: number; zone: Zone; speaking: 0 | 1 }[]
+    return events.map((e) => ({ ts: e.ts, zone: e.zone, speaking: e.speaking === 1 }))
+  }
+
   /** Newest first. */
   async listSessions(): Promise<SessionMeta[]> {
     const rows = this.db

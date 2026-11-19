@@ -8,8 +8,12 @@ meetings. This repository is a monorepo:
 | `electron/`       | Electron app (electron-vite, TypeScript): main/preload/renderer |
 | `python/`         | MediaPipe gaze tracker side-process                             |
 | `azure-function/` | Graph notification relay (stub)                                 |
-| `backend/`        | Cloud dashboard REST API (stub)                                 |
-| `dashboard/`      | Cloud dashboard web SPA (stub)                                  |
+| `backend/`        | Cloud dashboard REST API (Fastify + PostgreSQL)                 |
+| `dashboard/`      | Cloud dashboard web SPA (React + Vite + MSAL + Recharts)        |
+
+**Using the app?** See the [User Guide](docs/USER-GUIDE.md). **Testing it without Azure access?**
+See [Tester setup](docs/TESTER-SETUP.md) (manual Start/Stop Session from the tray). The rest of this
+README is for developers.
 
 ## Prerequisites
 
@@ -53,12 +57,34 @@ webcam and streams newline-delimited JSON on stdout:
 {"type": "error", "message": "Cannot open camera 7"}
 ```
 
-Commands are accepted on stdin, one JSON object per line: `{"cmd": "set_camera", "index": N}` and
-`{"cmd": "set_confidence_threshold", "value": 0.0-1.0}`. The process exits on SIGTERM/SIGINT or when
-stdin is closed. Frames are processed in memory only and are never stored or transmitted.
+Commands are accepted on stdin, one JSON object per line: `set_camera`, `set_confidence_threshold`,
+`set_stability`, `set_thresholds` and the `calibration_*` commands (see the docstring in
+`python/main.py` for the full protocol). The process exits on SIGTERM/SIGINT or when stdin is
+closed. Frames are processed in memory only and are never stored or transmitted.
 
-The zone thresholds in `python/gaze/classifier.py` (`GazeThresholds`) are starting values and
-should be tuned against real footage. macOS prompts for camera permission on first use.
+The default zone thresholds in `python/gaze/classifier.py` (`GazeThresholds`) are generic starting
+values. Each user can replace them with personal ones by running **Calibrate Eye Contact** (below).
+macOS prompts for camera permission on first use.
+
+### Calibration
+
+The tray menu has **Calibrate Eye Contact…** (**Recalibrate** once done). It opens a window at the
+top centre of the screen with a glowing lens target, a live mirrored webcam preview and the live
+readings (iris position, head turn and tilt, detected zone). Two guided steps follow a 3 s countdown
+each: look at the lens, then at the middle of the screen. `python/gaze/calibration.py` then fits
+personal thresholds: the centre of each reading while looking at the lens, a tolerance from its
+natural jitter (kept short of where the screen look sits), and a head-angle centre that removes the
+per-camera pose bias. The result is only offered for saving when at least 85% of the lens frames
+and 70% of the screen frames are classified correctly with it; otherwise the window explains what
+to change and offers to try again. **Use default settings** forgets the calibration.
+
+How it is protected: the renderer cannot supply thresholds, because main keeps the last fit the
+tracker produced and only that can be saved. Thresholds are range-checked in Python, in
+`protocol.ts` and again when read from disk (`calibration.json` in the user-data folder). The
+webcam preview exists only while the window is open, travels over the local child-process pipe as a
+small JPEG, and is never written to disk. The preview is validated as base64 and size-limited in the
+main process. The webcam also runs while the window is open outside a call, and stops again when it
+closes. In development, `OPEN_CALIBRATION=1 npx electron-vite dev` opens the window at startup.
 
 ## HUD, alerts and session history
 
@@ -115,8 +141,8 @@ active speaker in Teams (Graph, polled every 5 s, so about 5 s resolution). All 
 recorded; session summaries carry an overall breakdown plus a `speaking` breakdown, which is what
 the cloud dashboard reports. Sessions recorded before this change count as not speaking.
 
-Known limits: Windows is untested, the zone thresholds are untuned, and the HUD has only been
-checked at 2x DPI on macOS.
+Known limits: Windows is untested, the default zone thresholds are untuned (calibrate to fit your
+setup), and the HUD has only been checked at 2x DPI on macOS.
 
 ## Cloud sync and dashboard API
 
@@ -142,9 +168,43 @@ app registration for the API that exposes a delegated scope `Sessions.ReadWrite`
 app's registration must be granted that scope. `npm test --workspace backend` needs no cloud
 resources (PostgreSQL runs in-process via PGlite; tokens are signed with a test key).
 
-Not yet verified against real services: Entra token validation with live JWKS, `pg` against Azure
-Database for PostgreSQL, and an Azure App Service deployment. The web dashboard (`dashboard/`) and
-the Azure Static Web Apps / App Service configuration are not built yet.
+### Web dashboard (`dashboard/`)
+
+A React single-page app where a signed-in user sees their own history: a session list (date,
+meeting, speaking time, camera eye-contact %), a session page (donut of time per zone and a
+stacked timeline chart) and a trend page (camera % across sessions). It signs in with
+`@azure/msal-browser` (authorization-code flow with PKCE, tokens kept in `sessionStorage`) and calls
+the API with a bearer token. API responses are validated with Zod before rendering.
+
+Register a second Entra app registration for it, as a **Single-page application** with the
+dashboard's origin as redirect URI (`http://127.0.0.1:5173` for local development), and grant it the
+API's `Sessions.ReadWrite` scope. Then copy `dashboard/.env.example` to `dashboard/.env.local`, fill
+it in (all values are public client configuration, no secrets), add the dashboard origin to the
+API's `CORS_ORIGINS`, and run `npm run dev --workspace dashboard`.
+
+### Azure deployment
+
+- **Dashboard → Azure Static Web Apps:** `dashboard/public/staticwebapp.config.json` provides the
+  SPA fallback and security headers (CSP, HSTS, no-referrer). `.github/workflows/deploy-dashboard.yml`
+  tests, builds and uploads `dashboard/dist`. Set the repository variables `AZURE_TENANT_ID`,
+  `DASHBOARD_CLIENT_ID`, `API_SCOPE`, `API_BASE_URL` and the secret `AZURE_STATIC_WEB_APPS_API_TOKEN`.
+  The CSP `connect-src` allows `https://*.azurewebsites.net`; tighten it to your API's exact host if
+  you use a custom domain.
+- **Backend → Azure App Service (Node 22 Linux):** `.github/workflows/deploy-backend.yml` tests,
+  builds, packages `dist/` with production dependencies only, and deploys using OIDC federated login
+  (no stored Azure credentials). Set the repository variables `AZURE_DEPLOY_CLIENT_ID`,
+  `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `BACKEND_APP_NAME`. In the App Service configuration
+  set the variables from `backend/.env.example` (`DATABASE_URL` as a Key Vault reference,
+  `TRUST_PROXY=true`, `CORS_ORIGINS` to the dashboard origin, `HOST` to the instance's specific
+  internal address) and the startup command `node backend/dist/server.js`.
+
+Not yet verified against real services: Entra sign-in and token validation with live JWKS, `pg`
+against Azure Database for PostgreSQL, and both Azure deployments (the workflows have never run;
+the backend package was only checked to start from a clean directory). The dashboard pages were
+also rendered in headless Chrome against the real API (test data, signed test tokens, production
+CSP headers): the list, session and trend pages and the charts display correctly, a hostile
+meeting subject is shown as text, and another user's session id and a bad token are refused. The
+MSAL sign-in redirect itself has not been exercised.
 
 ## Scripts
 
@@ -160,6 +220,7 @@ the Azure Static Web Apps / App Service configuration are not built yet.
 | `npm run typecheck`     | `tsc --noEmit` for the Electron main/preload/renderer   |
 | `npm run build`         | Type-check and build the Electron app                   |
 | `npm test -w backend`   | Run the API tests (supertest-style, via Fastify inject) |
+| `npm test -w dashboard` | Run the dashboard logic tests                           |
 
 Distributables (run from `electron/`): `npm run build:win` (NSIS installer) and
 `npm run build:mac` (DMG). Build each on its target OS.

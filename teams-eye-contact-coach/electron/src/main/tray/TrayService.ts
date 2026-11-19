@@ -8,7 +8,13 @@ export interface TrayDeps {
   settings: Pick<SettingsService, 'getTrackingMode' | 'setTrackingMode'>
   signIn: () => Promise<void>
   signOut: () => Promise<void>
+  openHome: () => void
   openSettings: () => void
+  openCalibration: () => void
+  isCalibrated: () => boolean
+  /** True while a session is being tracked (detected automatically or started by hand). */
+  isSessionActive: () => boolean
+  toggleSession: () => void
 }
 
 const MODES: { mode: TrackingMode; label: string }[] = [
@@ -36,6 +42,11 @@ export class TrayService {
     const current = this.deps.settings.getTrackingMode()
 
     const template: MenuItemConstructorOptions[] = [
+      {
+        label: this.deps.isSessionActive() ? 'Stop Session' : 'Start Session',
+        click: () => this.deps.toggleSession()
+      },
+      { type: 'separator' },
       user
         ? {
             label: `Sign Out (${user.name})`,
@@ -55,7 +66,12 @@ export class TrayService {
           }
         }))
       },
+      { label: 'Open Eye Contact Coach', click: () => this.deps.openHome() },
       { label: 'Settings…', click: () => this.deps.openSettings() },
+      {
+        label: this.deps.isCalibrated() ? 'Recalibrate Eye Contact…' : 'Calibrate Eye Contact…',
+        click: () => this.deps.openCalibration()
+      },
       { type: 'separator' },
       { label: 'Quit', click: () => app.quit() }
     ]

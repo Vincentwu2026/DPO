@@ -29,6 +29,7 @@ describe('SettingsService', () => {
     expect(settings.getAll()).toEqual({
       trackingMode: 'both',
       cameraIndex: 0,
+      cameraAuto: true,
       alertThresholdSeconds: 5,
       alertAudioEnabled: true,
       alertVisualEnabled: true,
@@ -41,6 +42,7 @@ describe('SettingsService', () => {
   it('round-trips each setting through typed setters and getters', () => {
     settings.setTrackingMode('postcall')
     settings.setCameraIndex(2)
+    settings.set('cameraAuto', false)
     settings.setAlertThresholdSeconds(12)
     settings.setAlertAudioEnabled(false)
     settings.setAlertVisualEnabled(false)
@@ -49,6 +51,7 @@ describe('SettingsService', () => {
 
     expect(settings.getTrackingMode()).toBe('postcall')
     expect(settings.getCameraIndex()).toBe(2)
+    expect(settings.getCameraAuto()).toBe(false)
     expect(settings.getAlertThresholdSeconds()).toBe(12)
     expect(settings.getAlertAudioEnabled()).toBe(false)
     expect(settings.getAlertVisualEnabled()).toBe(false)
@@ -68,6 +71,7 @@ describe('SettingsService', () => {
       ['cameraIndex', -1],
       ['cameraIndex', 1.5],
       ['cameraIndex', '0'],
+      ['cameraAuto', 'yes'],
       ['alertThresholdSeconds', 0],
       ['alertThresholdSeconds', 31],
       ['alertThresholdSeconds', Number.NaN],

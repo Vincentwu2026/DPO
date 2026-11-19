@@ -16,13 +16,18 @@ class GazeThresholds:
     Gaze ratios are measured relative to the eye corners (see ``estimator``):
     ``h`` is 0.5 when the iris is centred between the corners, and ``v`` is 0.0 when the
     iris is on the corner line (positive = iris below the line). Angles are in degrees.
-    These are starting values; they are expected to be tuned against real footage.
+    The defaults are generic starting values; ``calibration.fit_thresholds`` derives personal
+    ones from a short calibration. ``yaw_center`` / ``pitch_center`` are the head angles that
+    mean "facing the camera" (the pose estimate has a per-user, per-camera bias); every yaw and
+    pitch limit is measured from them.
     """
 
     h_center: float = 0.5
     h_tolerance: float = 0.08
     v_center: float = 0.0
     v_tolerance: float = 0.05
+    yaw_center: float = 0.0
+    pitch_center: float = 0.0
     camera_max_yaw: float = 15.0
     camera_max_pitch: float = 15.0
     away_yaw: float = 40.0
@@ -43,8 +48,8 @@ def is_away(measurement: GazeMeasurement | None, t: GazeThresholds) -> bool:
     """No face, or head rotated beyond the away limits."""
     return (
         measurement is None
-        or abs(measurement.yaw) > t.away_yaw
-        or abs(measurement.pitch) > t.away_pitch
+        or abs(measurement.yaw - t.yaw_center) > t.away_yaw
+        or abs(measurement.pitch - t.pitch_center) > t.away_pitch
     )
 
 
@@ -56,8 +61,8 @@ def deviation(measurement: GazeMeasurement, t: GazeThresholds) -> float:
     return max(
         abs(measurement.h_ratio - t.h_center) / t.h_tolerance,
         abs(measurement.v_ratio - t.v_center) / t.v_tolerance,
-        abs(measurement.yaw) / t.camera_max_yaw,
-        abs(measurement.pitch) / t.camera_max_pitch,
+        abs(measurement.yaw - t.yaw_center) / t.camera_max_yaw,
+        abs(measurement.pitch - t.pitch_center) / t.camera_max_pitch,
     )
 
 

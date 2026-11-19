@@ -1,13 +1,19 @@
-import type { EventEmitter } from 'node:events'
+import { EventEmitter } from 'node:events'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import Store from 'electron-store'
 import { AlertEngine } from './alerts/AlertEngine'
 import { AuthService } from './auth/AuthService'
+import { CalibrationStore } from './calibration/CalibrationStore'
+import { CalibrationWindow } from './calibration/CalibrationWindow'
 import { shouldShowHud } from './hud/hudGeometry'
 import { HudPrefs } from './hud/HudPrefs'
 import { HudWindow } from './hud/HudWindow'
+import { parseDashboardUrl } from './report/dashboardUrl'
+import { ReportWindow } from './report/ReportWindow'
+import { buildHomeStatus } from '../shared/homeStatus'
+import { assembleReport, shouldShowReport } from '../shared/reportModel'
 import { FakeCall } from './meeting/FakeCall'
 import { MeetingService, type MeetingInfo } from './meeting/MeetingService'
 import { SessionRecorder } from './sessions/SessionRecorder'
@@ -16,6 +22,7 @@ import { isSettingsKey, SettingsService, type Settings } from './settings/Settin
 import { SyncService } from './sync/SyncService'
 import { CameraDeviceService } from './tracker/CameraDeviceService'
 import { isValidCameraIndex } from './tracker/protocol'
+import { resolveCameraIndex } from './tracker/resolveCamera'
 import { TrackerProcess } from './tracker/TrackerProcess'
 import { resolveTrackerLaunch } from './tracker/trackerLaunch'
 import { TrayService } from './tray/TrayService'
@@ -31,15 +38,23 @@ let auth: AuthService
 let settings: SettingsService
 let meeting: MeetingService | null = null
 let fakeCall: FakeCall | null = null
+/** Emits the same call events as MeetingService, driven by the tray's Start/Stop Session item. */
+const manualCall = new EventEmitter()
 let tracker: TrackerProcess
 let cameras: CameraDeviceService
 let tray: TrayService
 let hud: HudWindow
+let report: ReportWindow
+let calibrationWindow: CalibrationWindow
+let calibrationStore: CalibrationStore
+let dashboardUrl: string | null = null
+
 let alerts: AlertEngine
 let sessions: SessionRepository | null = null
 let recorder: SessionRecorder | null = null
 let sync: SyncService | null = null
 let settingsWindow: BrowserWindow | null = null
+let homeWindow: BrowserWindow | null = null
 /** Epoch ms when the current call's session began; null outside a call. */
 let sessionStartedAt: number | null = null
 /** Resolves once the current session row exists, so late meeting metadata is never lost. */
@@ -48,10 +63,17 @@ let cleanedUp = false
 /** True while Graph reports the signed-in user as the active speaker. */
 let speakerActive = false
 
-function createWindow(): void {
+/** The launch window: a small status page. Shows the existing one instead of opening a second. */
+function openHomeWindow(): void {
+  if (homeWindow && !homeWindow.isDestroyed()) {
+    if (homeWindow.isMinimized()) homeWindow.restore()
+    homeWindow.show()
+    homeWindow.focus()
+    return
+  }
   const win = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 520,
+    height: 480,
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -61,6 +83,10 @@ function createWindow(): void {
     }
   })
 
+  homeWindow = win
+  win.on('closed', () => {
+    homeWindow = null
+  })
   win.on('ready-to-show', () => win.show())
   loadRenderer(win, 'index.html')
 }
@@ -163,6 +189,7 @@ function onSettingsChanged(): void {
 
 function beginSession(): void {
   sessionStartedAt = Date.now()
+  void tray?.refresh()
   alerts.startSession()
   if (recorder) {
     const r = recorder
@@ -174,18 +201,43 @@ function beginSession(): void {
   applyHud()
 }
 
-function endSession(): void {
+/**
+ * `showReport` is true only when the call itself ended; signing out or quitting also closes the
+ * session but must not pop a window up.
+ */
+function endSession(showReport = false): void {
   sessionStartedAt = null
+  void tray?.refresh()
   setSpeaker(false)
   applyHud()
   const r = recorder
   if (r) {
     sessionReady = sessionReady.then(async () => {
       const id = await r.end()
+      if (!id) return
+      if (showReport && !cleanedUp) await openReportFor(id)
       // Upload in the background; a failure leaves the session queued for the next sync.
-      if (id) void sync?.syncSession(id).catch(() => undefined)
+      void sync?.syncSession(id).catch(() => undefined)
     })
   }
+}
+
+/** Shows the post-session report in every tracking mode, unless almost nothing was tracked. */
+async function openReportFor(sessionId: string): Promise<void> {
+  try {
+    const summary = await sessions?.getSessionSummary(sessionId)
+    if (summary && shouldShowReport(summary)) report.show(sessionId)
+  } catch (err) {
+    console.error('Report unavailable', err instanceof Error ? err.message : 'unknown')
+  }
+}
+
+async function loadReport(sessionId: string) {
+  if (!sessions) return null
+  const summary = await sessions.getSessionSummary(sessionId)
+  if (!summary) return null
+  const events = await sessions.getReportEvents(sessionId)
+  return assembleReport(summary, events, dashboardUrl !== null)
 }
 
 /** Cloud sync needs the API URL and scope; without them the app stays local-only. */
@@ -210,12 +262,47 @@ function syncPendingSessions(): void {
   void sync?.syncPending().catch(() => undefined)
 }
 
-function startTracker(): void {
+/** Something needs the webcam: a call in progress or the open calibration window. */
+function trackerNeeded(): boolean {
+  return sessionStartedAt !== null || calibrationWindow?.isOpen === true
+}
+
+/**
+ * Looks up the camera first, which can take a moment. If the call ended or the calibration window
+ * closed meanwhile, the tracker is not started, so the webcam never stays on by accident.
+ */
+async function startTracker(): Promise<void> {
   try {
-    tracker.start(settings.getCameraIndex(), settings.getGazeStability())
+    const cameraIndex = await resolveCameraIndex(
+      { cameraAuto: settings.getCameraAuto(), cameraIndex: settings.getCameraIndex() },
+      () => cameras.getTeamsSelectedIndex()
+    )
+    if (!trackerNeeded()) return
+    tracker.setThresholds(calibrationStore.getThresholds())
+    tracker.start(cameraIndex, settings.getGazeStability())
   } catch {
     broadcast('tracker:error', { message: 'The gaze tracker could not be started.', fatal: true })
   }
+}
+
+/** Re-resolves the camera after a settings change and hot-swaps a running tracker to it. */
+async function applyCameraSetting(): Promise<void> {
+  if (!tracker.running) return
+  const index = await resolveCameraIndex(
+    { cameraAuto: settings.getCameraAuto(), cameraIndex: settings.getCameraIndex() },
+    () => cameras.getTeamsSelectedIndex()
+  )
+  tracker.setCamera(index)
+}
+
+/** The calibration window needs the webcam even when no call is running. */
+function ensureTrackerForCalibration(): Promise<void> {
+  return tracker.running ? Promise.resolve() : startTracker()
+}
+
+/** Stops the tracker again after calibration, unless a call is using it. */
+function releaseTrackerAfterCalibration(): void {
+  if (sessionStartedAt === null) void tracker.stop()
 }
 
 function setSpeaker(active: boolean): void {
@@ -230,12 +317,12 @@ function bindCallEvents(source: EventEmitter): void {
   }
   // The tracker (and webcam) runs for exactly the duration of a detected call.
   source.on('MEETING_STARTED', () => {
-    startTracker()
     beginSession()
+    void startTracker()
   })
   source.on('MEETING_ENDED', () => {
     void tracker.stop()
-    endSession()
+    endSession(true)
   })
   source.on('MEETING_INFO', (info: MeetingInfo) => {
     const r = recorder
@@ -258,6 +345,11 @@ async function startMeetingService(): Promise<void> {
   meeting = new MeetingService({ auth, functionBaseUrl, clientState })
   bindCallEvents(meeting)
   await meeting.start()
+}
+
+/** Manual use without Azure: the user starts and stops a session from the tray beside Teams. */
+function toggleManualSession(): void {
+  manualCall.emit(sessionStartedAt === null ? 'MEETING_STARTED' : 'MEETING_ENDED')
 }
 
 /** Dev only (never in a packaged build): simulate a Teams call without Azure/Graph. */
@@ -312,6 +404,20 @@ function registerIpcHandlers(): void {
   })
   ipcMain.handle('auth:get-user', () => auth.getSignedInUser())
 
+  ipcMain.handle('home:get-status', async () => {
+    const user = await auth.getSignedInUser().catch(() => null)
+    return buildHomeStatus({
+      userName: user?.name ?? null,
+      meetingConfigured: Boolean(
+        process.env['FUNCTION_BASE_URL'] && process.env['GRAPH_CLIENT_STATE']
+      ),
+      cloudConfigured: sync !== null,
+      calibrated: calibrationStore.getInfo() !== null
+    })
+  })
+  ipcMain.handle('home:open-calibration', () => calibrationWindow.show())
+  ipcMain.handle('home:open-settings', () => openSettingsWindow())
+
   ipcMain.handle('settings:get', (_event, key: unknown) => {
     if (!isSettingsKey(key)) throw new Error('Unknown setting')
     return settings.get(key)
@@ -319,7 +425,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle('settings:set', (_event, key: unknown, value: unknown) => {
     if (!isSettingsKey(key)) throw new Error('Unknown setting')
     settings.set(key, value)
-    if (key === 'cameraIndex') tracker.setCamera(settings.getCameraIndex())
+    if (key === 'cameraIndex' || key === 'cameraAuto') void applyCameraSetting()
     onSettingsChanged()
     void tray.refresh()
   })
@@ -330,7 +436,7 @@ function registerIpcHandlers(): void {
       if (!isSettingsKey(key)) throw new Error('Unknown setting')
       settings.set(key, value)
     }
-    if ('cameraIndex' in values) tracker.setCamera(settings.getCameraIndex())
+    if ('cameraIndex' in values || 'cameraAuto' in values) void applyCameraSetting()
     onSettingsChanged()
     void tray.refresh()
   })
@@ -346,6 +452,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle('tracker:set-camera', (_event, index: unknown) => {
     if (!isValidCameraIndex(index)) throw new Error('Invalid camera index')
     settings.set('cameraIndex', index)
+    settings.set('cameraAuto', false)
     return tracker.setCamera(index)
   })
 
@@ -378,6 +485,13 @@ void app.whenReady().then(async () => {
   })
   settings = new SettingsService()
   alerts = new AlertEngine({ thresholdSeconds: settings.getAlertThresholdSeconds() })
+  dashboardUrl = parseDashboardUrl(process.env['DASHBOARD_URL'])
+  report = new ReportWindow({
+    preloadPath: join(__dirname, '../preload/index.js'),
+    loadPage: (win) => loadRenderer(win, 'report/index.html'),
+    dashboardUrl,
+    loadReport
+  })
   hud = new HudWindow({
     hintsEnabled: settings.getCoachingHintsEnabled(),
     prefs: new HudPrefs(new Store({ name: 'hud' })),
@@ -403,6 +517,16 @@ void app.whenReady().then(async () => {
   }
   sync = createSyncService()
   setupTracker()
+  calibrationStore = new CalibrationStore(new Store({ name: 'calibration' }))
+  calibrationWindow = new CalibrationWindow({
+    onChanged: () => void tray?.refresh(),
+    preloadPath: join(__dirname, '../preload/index.js'),
+    loadPage: (win) => loadRenderer(win, 'calibration/index.html'),
+    tracker,
+    store: calibrationStore,
+    ensureTracker: ensureTrackerForCalibration,
+    releaseTracker: releaseTrackerAfterCalibration
+  })
   tray = new TrayService({
     auth,
     settings: {
@@ -414,11 +538,17 @@ void app.whenReady().then(async () => {
     },
     signIn,
     signOut,
-    openSettings: openSettingsWindow
+    openHome: openHomeWindow,
+    openSettings: openSettingsWindow,
+    openCalibration: () => calibrationWindow.show(),
+    isCalibrated: () => calibrationStore.getInfo() !== null,
+    isSessionActive: () => sessionStartedAt !== null,
+    toggleSession: toggleManualSession
   })
 
+  bindCallEvents(manualCall)
   registerIpcHandlers()
-  createWindow()
+  openHomeWindow()
   await tray.create()
 
   if (await auth.getSignedInUser().catch(() => null)) {
@@ -426,9 +556,11 @@ void app.whenReady().then(async () => {
     syncPendingSessions()
   }
   startFakeCallIfRequested()
+  // Dev only: open the calibration window straight away.
+  if (!app.isPackaged && process.env['OPEN_CALIBRATION'] === '1') calibrationWindow.show()
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    openHomeWindow()
   })
 })
 
@@ -443,6 +575,8 @@ app.on('before-quit', (event) => {
   stopMeetingService()
   void tracker?.stop()
   hud?.hide()
+  report?.close()
+  calibrationWindow?.close()
   tray?.destroy()
   void sessionReady
     .catch(() => undefined)

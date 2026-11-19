@@ -14,7 +14,7 @@ export default tseslint.config(
     languageOptions: { globals: globals.node }
   },
   {
-    files: ['electron/src/renderer/**/*.ts'],
+    files: ['electron/src/renderer/**/*.ts', 'dashboard/src/**/*.{ts,tsx}'],
     languageOptions: { globals: globals.browser }
   },
   {

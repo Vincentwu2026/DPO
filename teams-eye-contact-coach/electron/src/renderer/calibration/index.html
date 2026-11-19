@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Calibrate Eye Contact</title>
+    <link rel="stylesheet" href="./calibration.css" />
+  </head>
+  <body data-step="intro">
+    <div id="lens" aria-hidden="true">
+      <span class="ring"></span>
+      <span class="ring ring-2"></span>
+      <span class="dot"></span>
+    </div>
+
+    <main>
+      <h1 id="title">Calibrate eye contact</h1>
+      <p id="instruction" class="lead"></p>
+
+      <div class="stage">
+        <img id="preview" alt="Your camera view, mirrored" width="320" height="240" />
+        <div id="countdown" hidden></div>
+        <div id="face-hint" class="hint" role="status" hidden></div>
+      </div>
+
+      <div class="progress" aria-hidden="true"><div id="bar"></div></div>
+
+      <div id="result" class="result" hidden>
+        <h2 id="result-title"></h2>
+        <p id="result-detail" class="muted"></p>
+      </div>
+
+      <dl class="readings" aria-label="Live readings">
+        <div>
+          <dt>Detected</dt>
+          <dd id="r-zone">–</dd>
+        </div>
+        <div>
+          <dt>Iris across</dt>
+          <dd id="r-h">–</dd>
+        </div>
+        <div>
+          <dt>Iris up/down</dt>
+          <dd id="r-v">–</dd>
+        </div>
+        <div>
+          <dt>Head turn</dt>
+          <dd id="r-yaw">–</dd>
+        </div>
+        <div>
+          <dt>Head tilt</dt>
+          <dd id="r-pitch">–</dd>
+        </div>
+      </dl>
+
+      <p id="saved" class="muted"></p>
+
+      <footer class="actions">
+        <button id="start" type="button" class="primary">Start</button>
+        <button id="save" type="button" class="primary" hidden>Save and close</button>
+        <button id="retry" type="button" hidden>Try again</button>
+        <button id="reset" type="button" hidden>Use default settings</button>
+        <button id="close" type="button">Close</button>
+        <span id="status" class="muted" role="status"></span>
+      </footer>
+    </main>
+    <script type="module" src="./calibration.ts"></script>
+  </body>
+</html>

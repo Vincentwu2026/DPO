@@ -1,0 +1,242 @@
+:root {
+  --fg: #1f2328;
+  --muted: #57606a;
+  --border: #d8dee4;
+  --surface: #f6f8fa;
+  --accent: #0f62fe;
+  --good: #22a559;
+  --warn: #e8a000;
+  --bad: #d64545;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: #ffffff;
+  color: var(--fg);
+  font:
+    14px/1.5 -apple-system,
+    'Segoe UI',
+    system-ui,
+    sans-serif;
+}
+
+main {
+  padding: 92px 28px 24px;
+}
+
+h1 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+h2 {
+  font-size: 16px;
+  margin: 0 0 2px;
+}
+
+.lead {
+  margin: 0 0 14px;
+  font-size: 15px;
+  min-height: 3em;
+}
+
+.lead:empty {
+  display: none;
+}
+
+.muted {
+  color: var(--muted);
+  margin: 0;
+}
+
+/* The target sits at the very top of the window, as near the real lens as the screen allows. */
+#lens {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  width: 64px;
+  height: 64px;
+  margin-left: -32px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+#lens .dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #5b6b8c 0%, #1b2338 55%, #05070d 100%);
+  border: 2px solid #1f2328;
+  box-shadow: inset 0 0 0 3px #0f62fe33;
+}
+
+#lens .ring {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  opacity: 0.35;
+}
+
+body[data-step='camera'] #lens .ring {
+  animation: pulse 1.4s ease-out infinite;
+}
+body[data-step='camera'] #lens .ring-2 {
+  animation-delay: 0.7s;
+}
+body:not([data-step='camera']) #lens .ring {
+  opacity: 0.15;
+}
+
+@keyframes pulse {
+  from {
+    transform: scale(0.7);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-step='camera'] #lens .ring {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+.stage {
+  position: relative;
+  width: 320px;
+  height: 240px;
+  margin: 0 auto 12px;
+  border-radius: 8px;
+  background: #11151c;
+  overflow: hidden;
+}
+
+#preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#preview:not([src]) {
+  visibility: hidden;
+}
+
+#countdown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 96px;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgb(0 0 0 / 0.45);
+}
+
+.hint {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgb(214 69 69 / 0.92);
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.progress {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+#bar {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.1s linear;
+}
+
+.result {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-left: 4px solid var(--border);
+  background: var(--surface);
+  border-radius: 0 6px 6px 0;
+}
+.result[data-level='good'] {
+  border-left-color: var(--good);
+}
+.result[data-level='warn'] {
+  border-left-color: var(--warn);
+}
+
+.readings {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin: 16px 0 8px;
+}
+.readings div {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+.readings dt {
+  font-size: 11px;
+  color: var(--muted);
+}
+.readings dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+button {
+  font: inherit;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #ffffff;
+  cursor: pointer;
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+[hidden] {
+  display: none !important;
+}

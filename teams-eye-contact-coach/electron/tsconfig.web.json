@@ -16,7 +16,11 @@
     "src/renderer/src/**/*",
     "src/renderer/settings/**/*",
     "src/renderer/hud/**/*",
+    "src/renderer/report/**/*",
+    "src/renderer/calibration/**/*",
     "src/shared/**/*",
+    "src/main/tracker/protocol.ts",
+    "src/main/tracker/thresholds.ts",
     "src/preload/index.d.ts"
   ]
 }

@@ -6,6 +6,8 @@ export type Stability = 'responsive' | 'balanced' | 'steady'
 export interface Settings {
   trackingMode: TrackingMode
   cameraIndex: number
+  /** Follow the camera Teams uses until the user picks one; `cameraIndex` is then ignored. */
+  cameraAuto: boolean
   alertThresholdSeconds: number
   alertAudioEnabled: boolean
   alertVisualEnabled: boolean
@@ -20,6 +22,7 @@ export type SettingsKey = keyof Settings
 export const DEFAULT_SETTINGS: Settings = {
   trackingMode: 'both',
   cameraIndex: 0,
+  cameraAuto: true,
   alertThresholdSeconds: 5,
   alertAudioEnabled: true,
   alertVisualEnabled: true,
@@ -35,6 +38,7 @@ const validators: { [K in SettingsKey]: (value: unknown) => value is Settings[K]
   trackingMode: (v): v is TrackingMode => TRACKING_MODES.includes(v as TrackingMode),
   // The Python tracker probes camera indices 0-9 only.
   cameraIndex: (v): v is number => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 9,
+  cameraAuto: (v): v is boolean => typeof v === 'boolean',
   alertThresholdSeconds: (v): v is number =>
     typeof v === 'number' && Number.isFinite(v) && v >= 1 && v <= 30,
   alertAudioEnabled: (v): v is boolean => typeof v === 'boolean',
@@ -69,6 +73,7 @@ export class SettingsService {
     return {
       trackingMode: this.get('trackingMode'),
       cameraIndex: this.get('cameraIndex'),
+      cameraAuto: this.get('cameraAuto'),
       alertThresholdSeconds: this.get('alertThresholdSeconds'),
       alertAudioEnabled: this.get('alertAudioEnabled'),
       alertVisualEnabled: this.get('alertVisualEnabled'),
@@ -89,6 +94,10 @@ export class SettingsService {
   }
   setCameraIndex(index: number): void {
     this.set('cameraIndex', index)
+  }
+
+  getCameraAuto(): boolean {
+    return this.get('cameraAuto')
   }
 
   getAlertThresholdSeconds(): number {

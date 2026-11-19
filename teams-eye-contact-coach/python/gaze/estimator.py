@@ -127,12 +127,21 @@ class GazeEstimator:
         )
         self._landmarker = vision.FaceLandmarker.create_from_options(options)
 
+    @property
+    def thresholds(self) -> GazeThresholds:
+        return self._thresholds
+
     def set_stability(self, preset: str) -> None:
         """Switch the smoothing preset (``responsive`` / ``balanced`` / ``steady``)."""
         self._stabilizer = GazeStabilizer(preset, self._thresholds)
 
-    def process(self, frame_bgr: np.ndarray, timestamp_ms: int) -> tuple[str, float]:
-        """Classify one frame into a stabilised ``(zone, confidence)``.
+    def set_thresholds(self, thresholds: GazeThresholds) -> None:
+        """Use new (e.g. calibrated) zone thresholds; smoothing restarts from scratch."""
+        self._thresholds = thresholds
+        self._stabilizer = GazeStabilizer(self._stabilizer.preset_name, thresholds)
+
+    def analyze(self, frame_bgr: np.ndarray, timestamp_ms: int) -> GazeMeasurement | None:
+        """Raw per-frame measurements, or ``None`` when no face is found.
 
         ``timestamp_ms`` must be strictly increasing between calls.
         """
@@ -140,13 +149,21 @@ class GazeEstimator:
         rgb = np.ascontiguousarray(cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB))
         image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
         result = self._landmarker.detect_for_video(image, timestamp_ms)
-
-        measurement: GazeMeasurement | None = None
         if result.face_landmarks and len(result.face_landmarks[0]) >= _MIN_LANDMARKS:
             landmarks = result.face_landmarks[0]
             points = np.array([(lm.x * width, lm.y * height) for lm in landmarks], dtype=np.float64)
-            measurement = measure(points, width, height)
+            return measure(points, width, height)
+        return None
+
+    def stabilize(
+        self, timestamp_ms: int, measurement: GazeMeasurement | None
+    ) -> tuple[str, float]:
+        """Turn one measurement into a smoothed ``(zone, confidence)``."""
         return self._stabilizer.update(timestamp_ms / 1000.0, measurement)
+
+    def process(self, frame_bgr: np.ndarray, timestamp_ms: int) -> tuple[str, float]:
+        """Classify one frame into a stabilised ``(zone, confidence)``."""
+        return self.stabilize(timestamp_ms, self.analyze(frame_bgr, timestamp_ms))
 
     def close(self) -> None:
         self._landmarker.close()

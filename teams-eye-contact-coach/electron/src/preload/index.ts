@@ -56,6 +56,35 @@ const sessions = {
   getSummary: (sessionId: string) => ipcRenderer.invoke('sessions:get-summary', sessionId)
 }
 
+// Narrow surface for the report window only; main rejects these calls from any other sender.
+// The session shown is fixed by main, so the renderer cannot ask for another one.
+const report = {
+  get: () => ipcRenderer.invoke('report:get'),
+  exportPdf: () => ipcRenderer.invoke('report:export-pdf'),
+  openHistory: () => ipcRenderer.invoke('report:open-history'),
+  close: () => ipcRenderer.invoke('report:close')
+}
+
+// Narrow surface for the calibration window only. It cannot supply thresholds: main keeps the
+// last fit and `apply` saves exactly that.
+const calibration = {
+  onUpdate: (cb: (update: unknown) => void) => subscribeWithPayload('calibration:update', cb),
+  setPhase: (phase: 'camera' | 'screen' | null) =>
+    ipcRenderer.invoke('calibration:set-phase', phase),
+  fit: () => ipcRenderer.invoke('calibration:fit'),
+  apply: () => ipcRenderer.invoke('calibration:apply'),
+  reset: () => ipcRenderer.invoke('calibration:reset'),
+  getInfo: () => ipcRenderer.invoke('calibration:get-info'),
+  close: () => ipcRenderer.invoke('calibration:close')
+}
+
+// Status and shortcuts for the launch window. Nothing here exposes tokens or file paths.
+const home = {
+  getStatus: () => ipcRenderer.invoke('home:get-status'),
+  openCalibration: () => ipcRenderer.invoke('home:open-calibration'),
+  openSettings: () => ipcRenderer.invoke('home:open-settings')
+}
+
 // Narrow surface for the HUD window only; main ignores these channels from any other sender.
 const hud = {
   getState: () => ipcRenderer.invoke('hud:get-state'),
@@ -76,4 +105,7 @@ contextBridge.exposeInMainWorld('settings', settings)
 contextBridge.exposeInMainWorld('meeting', meeting)
 contextBridge.exposeInMainWorld('gazeTracker', gazeTracker)
 contextBridge.exposeInMainWorld('hud', hud)
+contextBridge.exposeInMainWorld('home', home)
+contextBridge.exposeInMainWorld('report', report)
+contextBridge.exposeInMainWorld('calibration', calibration)
 contextBridge.exposeInMainWorld('sessions', sessions)

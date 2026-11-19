@@ -8,11 +8,21 @@ stdout (this process -> Electron)
   {"type": "devices", "list": [{"index": 0, "name": "..."}]}
   {"type": "gaze", "ts": 1700000000.123, "zone": "camera|screen|away", "confidence": 0.91}
   {"type": "error", "message": "..."}
+  Only while calibrating (about 10 per second, including a small mirrored JPEG preview):
+  {"type": "calibration", "face": true, "h": 0.51, "v": 0.01, "yaw": 2.0, "pitch": -1.0,
+   "zone": "camera|screen|away", "phase": "camera|screen|null",
+   "camera_samples": 12, "screen_samples": 0, "preview": "<base64 jpeg>"}
+  {"type": "calibration_result", "ok": true, "good": true, "camera_samples": 40,
+   "screen_samples": 40, "camera_hit": 0.97, "screen_hit": 0.9, "thresholds": {...}}
 
 stdin (Electron -> this process)
   {"cmd": "set_camera", "index": N}
   {"cmd": "set_confidence_threshold", "value": 0.0-1.0}
   {"cmd": "set_stability", "preset": "responsive|balanced|steady"}
+  {"cmd": "set_thresholds", "thresholds": {...} | null}   (null restores the defaults)
+  {"cmd": "calibration_start"} / {"cmd": "calibration_stop"}
+  {"cmd": "calibration_phase", "phase": "camera|screen|null"}
+  {"cmd": "calibration_fit"}
 
 Exits cleanly on SIGTERM/SIGINT or when stdin is closed. Frames never leave this process.
 """
@@ -29,11 +39,19 @@ import time
 from pathlib import Path
 from typing import Any
 
+from gaze.calibration import (
+    PHASES,
+    CalibrationSession,
+    parse_thresholds,
+    thresholds_to_dict,
+)
+from gaze.classifier import GazeMeasurement, GazeThresholds
 from gaze.stabilizer import DEFAULT_STABILITY, PRESETS
 
 VERSION = "0.1.0"
 DEFAULT_MODEL = Path(__file__).resolve().parent / "models" / "face_landmarker.task"
 READ_FAILURE_RETRY_S = 0.1
+CALIBRATION_UPDATE_INTERVAL_S = 0.1
 MAX_CAMERA_INDEX = 9
 
 
@@ -67,7 +85,59 @@ def parse_command(line: str) -> dict[str, Any] | None:
         preset = data.get("preset")
         if isinstance(preset, str) and preset in PRESETS:
             return {"cmd": "set_stability", "preset": preset}
+    elif data.get("cmd") == "set_thresholds":
+        if "thresholds" not in data:
+            return None
+        if data["thresholds"] is None:
+            return {"cmd": "set_thresholds", "thresholds": None}
+        thresholds = parse_thresholds(data["thresholds"])
+        if thresholds is not None:
+            return {"cmd": "set_thresholds", "thresholds": thresholds}
+    elif data.get("cmd") in ("calibration_start", "calibration_stop", "calibration_fit"):
+        return {"cmd": data["cmd"]}
+    elif data.get("cmd") == "calibration_phase":
+        phase = data.get("phase")
+        if phase is None or (isinstance(phase, str) and phase in PHASES):
+            return {"cmd": "calibration_phase", "phase": phase}
     return None
+
+
+def calibration_message(
+    measurement: GazeMeasurement | None,
+    zone: str,
+    session: CalibrationSession,
+    preview: str | None,
+) -> dict[str, Any]:
+    """One live calibration update. Numbers are ``None`` while no face is visible."""
+    return {
+        "type": "calibration",
+        "face": measurement is not None,
+        "h": None if measurement is None else round(measurement.h_ratio, 3),
+        "v": None if measurement is None else round(measurement.v_ratio, 3),
+        "yaw": None if measurement is None else round(measurement.yaw, 1),
+        "pitch": None if measurement is None else round(measurement.pitch, 1),
+        "zone": zone,
+        "phase": session.phase,
+        "camera_samples": session.count("camera"),
+        "screen_samples": session.count("screen"),
+        "preview": preview,
+    }
+
+
+def calibration_result_message(session: CalibrationSession) -> dict[str, Any]:
+    result = session.fit()
+    if result is None:
+        return {"type": "calibration_result", "ok": False}
+    return {
+        "type": "calibration_result",
+        "ok": True,
+        "good": result.good,
+        "camera_samples": result.camera_samples,
+        "screen_samples": result.screen_samples,
+        "camera_hit": round(result.camera_hit, 3),
+        "screen_hit": round(result.screen_hit, 3),
+        "thresholds": thresholds_to_dict(result.thresholds),
+    }
 
 
 def _unit_float(text: str) -> float:
@@ -114,6 +184,7 @@ def run(args: argparse.Namespace) -> int:
     # Heavy imports are deferred so --help and the helpers above stay fast and testable.
     from gaze.camera import discover_cameras, open_camera
     from gaze.estimator import GazeEstimator
+    from gaze.preview import encode_preview
 
     if args.list_devices:
         emit({"type": "devices", "list": discover_cameras()})
@@ -141,6 +212,8 @@ def run(args: argparse.Namespace) -> int:
         emit({"type": "error", "message": f"Cannot open camera {args.camera_index}"})
 
     last_timestamp_ms = -1
+    calibration: CalibrationSession | None = None
+    last_update = 0.0
     try:
         while not stop.is_set():
             try:
@@ -160,10 +233,25 @@ def run(args: argparse.Namespace) -> int:
                 elif command["cmd"] == "set_stability":
                     stability = command["preset"]
                     estimator.set_stability(stability)
+                elif command["cmd"] == "set_thresholds":
+                    estimator.set_thresholds(command["thresholds"] or GazeThresholds())
+                elif command["cmd"] == "calibration_start":
+                    calibration = CalibrationSession()
+                elif command["cmd"] == "calibration_stop":
+                    calibration = None
+                elif command["cmd"] == "calibration_phase":
+                    if calibration is not None:
+                        calibration.set_phase(command["phase"])
+                elif command["cmd"] == "calibration_fit":
+                    if calibration is not None:
+                        emit(calibration_result_message(calibration))
                 else:
                     estimator.close()
                     estimator = GazeEstimator(
-                        args.model, min_confidence=command["value"], stability=stability
+                        args.model,
+                        min_confidence=command["value"],
+                        thresholds=estimator.thresholds,
+                        stability=stability,
                     )
                 continue
 
@@ -178,7 +266,14 @@ def run(args: argparse.Namespace) -> int:
 
             # MediaPipe VIDEO mode requires strictly increasing timestamps.
             last_timestamp_ms = max(last_timestamp_ms + 1, int(time.monotonic() * 1000))
-            zone, score = estimator.process(frame, last_timestamp_ms)
+            measurement = estimator.analyze(frame, last_timestamp_ms)
+            zone, score = estimator.stabilize(last_timestamp_ms, measurement)
+            if calibration is not None:
+                calibration.add(measurement)
+                now = time.monotonic()
+                if now - last_update >= CALIBRATION_UPDATE_INTERVAL_S:
+                    last_update = now
+                    emit(calibration_message(measurement, zone, calibration, encode_preview(frame)))
             emit(
                 {
                     "type": "gaze",

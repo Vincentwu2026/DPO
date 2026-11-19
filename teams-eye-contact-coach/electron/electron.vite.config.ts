@@ -18,7 +18,9 @@ export default defineConfig({
         input: {
           index: resolve('src/renderer/index.html'),
           settings: resolve('src/renderer/settings/index.html'),
-          hud: resolve('src/renderer/hud/index.html')
+          hud: resolve('src/renderer/hud/index.html'),
+          report: resolve('src/renderer/report/index.html'),
+          calibration: resolve('src/renderer/calibration/index.html')
         }
       }
     }

@@ -59,6 +59,14 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     if (cmd.cmd === 'set_camera') out({ type: 'error', message: `camera set to ${cmd.index}` })
     if (cmd.cmd === 'set_stability')
       out({ type: 'error', message: `stability set to ${cmd.preset}` })
+    if (cmd.cmd === 'set_thresholds')
+      out({
+        type: 'error',
+        message: `thresholds ${cmd.thresholds ? cmd.thresholds.h_center : 'default'}`
+      })
+    if (cmd.cmd === 'calibration_start') out({ type: 'error', message: 'calibration started' })
+    if (cmd.cmd === 'calibration_phase') out({ type: 'error', message: `phase ${cmd.phase}` })
+    if (cmd.cmd === 'calibration_fit') out({ type: 'calibration_result', ok: false })
   } catch {
     // ignore
   }

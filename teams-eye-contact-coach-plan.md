@@ -66,7 +66,7 @@ Electron Renderer
 
 ### Sub-Task 1 — Project Scaffold
 
-**Status:** [ ] pending
+**Status:** [x] done (workspaces, electron-vite app, electron-builder config, Python package, ESLint/Prettier and Ruff/Black, `.gitignore` and README are in place; typecheck, lint and format checks pass. Windows packaging was not verified.)
 
 **Intent:**
 Establish the monorepo structure, tooling, and local dev scripts so every subsequent sub-task has a stable foundation to build on.
@@ -97,7 +97,9 @@ Establish the monorepo structure, tooling, and local dev scripts so every subseq
 
 ### Sub-Task 2 — Microsoft Graph Auth, Meeting Detection, and Active-Speaker Events
 
-**Status:** [x] done
+**Status:** [x] done, except host-triggered start/stop (deferred, see below)
+
+> **Deferred by decision:** the host `START_TRACKING` / `STOP_TRACKING` control (Expected Outcomes bullet 6, Todo item 7) is not wired in the desktop app. The relay and `MeetingService` can carry the messages, but nothing sends or acts on them. Tracking and the webcam run automatically for the whole call, from `MEETING_STARTED` to `MEETING_ENDED`. The active speaker is used to mark speaking time for the dashboard, not to gate tracking. Revisit once it can be tested against live Teams.
 
 **Intent:**
 Authenticate the user against their Microsoft 365 account using MSAL, subscribe to meeting presence and active-speaker events via Microsoft Graph, relay events to the Electron app via an Azure Function WebSocket relay, and expose a tracking-mode selector — so each participant knows when to start tracking (host-triggered) and tracking automatically hands off as the active speaker changes.
@@ -331,7 +333,7 @@ Persist every session's gaze event timeline and aggregate statistics to a local 
 
 ### Sub-Task 8 — Cloud Dashboard Backend
 
-**Status:** [-] partially done — backend API and desktop sync complete; dashboard SPA and Azure deployment config remain (todos 6–7)
+**Status:** [x] done (backend API, desktop SyncService, dashboard SPA, and Azure deployment config are built; tests, type-check, lint and production build pass. The SPA pages were verified in headless Chrome against the real API with test data. Not verified against real Azure services: Entra sign-in/JWKS, Azure PostgreSQL, or the two deploy workflows.)
 
 **Intent:**
 Build a lightweight REST API backend and a web dashboard so coaches and managers can view presenter gaze history across sessions.
@@ -376,7 +378,17 @@ Build a lightweight REST API backend and a web dashboard so coaches and managers
 
 ### Sub-Task 9 — Post-Session Report UI
 
-**Status:** [ ] pending
+**Status:** [x] done (with the caveats below)
+
+**What was built and checked:**
+- `ReportWindow` opens after `MEETING_ENDED` in every tracking mode when at least 5 s were tracked. It does not open on sign-out or quit. The session id is held in main; the renderer cannot choose it, and every IPC handler rejects other senders.
+- The renderer (`electron/src/renderer/report/`) shows duration, a headline camera %, a mode badge, a donut, a stacked timeline and up to three tips. It uses SVG and `textContent` only, under a strict CSP. The basis is speaking time when at least 10 s were spoken, otherwise the whole call, and the report says which.
+- Tips are rule-based (`electron/src/shared/reportModel.ts`), with inline snapshot tests (16 tests). Calls under 30 s get a note instead of tips.
+- Export PDF writes `eye-contact-report-<date>-<time>.pdf` (never the meeting title) to Downloads, mode 0600, never overwriting. "View full history" opens `DASHBOARD_URL` (https, or http on loopback) in the default browser and is hidden when unset.
+- The timeline is bucketed from the session's events in main; raw events are not sent to the renderer.
+- Deviation from the plan: the sessionId is not a URL parameter and the page does not call `window.sessionStore`. A dedicated `window.report` API is used so the page cannot ask for another session.
+
+**Not verified:** the report window was never looked at in a running Electron app, PDF export was not run for real, and the history button was not clicked. A fake call did produce and save a session, but only unit tests and the build cover the report window itself.
 
 **Intent:**
 Show an in-app post-session report window immediately after a meeting ends, so the presenter gets instant feedback without opening a browser.
@@ -404,6 +416,21 @@ Show an in-app post-session report window immediately after a meeting ends, so t
 **Relevant Context:**
 - `webContents.printToPDF` returns a Buffer; write to `app.getPath('downloads')`.
 - Keep report window lightweight — load only the session summary, not all raw gaze events.
+
+---
+
+### Addition — Personal Calibration (not in the original plan)
+
+**Status:** [x] done (with the caveats below)
+
+**Why:** On the developer's webcam the "looking at the camera" pose read about 17° of head turn away from the generic thresholds, so the default zones classified a camera look as "screen" (0% camera in a fake call).
+
+**What was built:**
+- Python tracker: a calibration mode that measures raw iris and head-pose values, and a pure fitting module (`python/gaze/calibration.py`) that derives personal thresholds and rejects poor fits with a reason.
+- Electron main: `CalibrationStore` (validated on read), `CalibrationWindow` (top-centre, lens target, live mirrored preview, readings, guided lens and screen steps), and a tray item "Calibrate Eye Contact…". Saved thresholds are re-sent to the tracker after every spawn or restart.
+- The preview is shown only in that window while it is open; frames are never saved.
+
+**Not verified:** a saved calibration being applied by the tracker during a real call (unit tests with a mock tracker only), and the calibration quality on anyone other than the developer.
 
 ---
 

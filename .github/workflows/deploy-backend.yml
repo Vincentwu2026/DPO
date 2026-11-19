@@ -1,0 +1,58 @@
+name: Deploy backend (Azure App Service)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "teams-eye-contact-coach/backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # OIDC federated login to Azure; no stored credentials
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: teams-eye-contact-coach
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: teams-eye-contact-coach/package-lock.json
+
+      - run: npm ci --workspace backend --include-workspace-root=false
+      - run: npm test --workspace backend
+      - run: npm run build --workspace backend
+
+      # Package: compiled code + the backend's production dependencies from the lock file.
+      - name: Assemble package
+        run: |
+          mkdir -p package/backend
+          cp -r backend/dist package/backend/dist
+          cp backend/package.json package/backend/package.json
+          cp package.json package-lock.json package/
+          (cd package && npm ci --omit=dev --workspace backend --include-workspace-root=false --ignore-scripts)
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_DEPLOY_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # DATABASE_URL and the other runtime settings live in the App Service configuration
+      # (DATABASE_URL as a Key Vault reference), never in this repository.
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.BACKEND_APP_NAME }}
+          package: teams-eye-contact-coach/package

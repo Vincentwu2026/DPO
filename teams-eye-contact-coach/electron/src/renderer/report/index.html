@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Eye Contact Report</title>
+    <link rel="stylesheet" href="./report.css" />
+  </head>
+  <body>
+    <main id="report" aria-live="polite">
+      <p id="loading" class="muted">Preparing your report…</p>
+      <p id="empty" class="muted" hidden>There is no report for this session.</p>
+
+      <div id="content" hidden>
+        <header>
+          <h1 id="title">Eye contact report</h1>
+          <p id="meta" class="muted"></p>
+          <span id="mode-badge" class="badge"></span>
+        </header>
+
+        <section class="headline" aria-label="Camera eye contact">
+          <div id="headline-value" class="headline-value">0%</div>
+          <div id="headline-label" class="muted"></div>
+        </section>
+
+        <section>
+          <h2>Where you looked</h2>
+          <div class="donut-row">
+            <svg
+              id="donut"
+              viewBox="0 0 120 120"
+              width="160"
+              height="160"
+              role="img"
+              aria-label="Share of time in each gaze zone"
+            ></svg>
+            <ul id="legend" class="legend"></ul>
+          </div>
+        </section>
+
+        <section>
+          <h2>Over the session</h2>
+          <p class="muted">Seconds in each zone, in equal slices of the session.</p>
+          <svg
+            id="timeline"
+            viewBox="0 0 400 140"
+            preserveAspectRatio="none"
+            role="img"
+            aria-label="Gaze zones over the session"
+          ></svg>
+          <div class="axis"><span>Start</span><span id="axis-end"></span></div>
+        </section>
+
+        <section>
+          <h2>Tips</h2>
+          <ul id="tips" class="tips"></ul>
+        </section>
+
+        <footer class="actions">
+          <button id="export" type="button">Export PDF</button>
+          <button id="history" type="button" hidden>View full history</button>
+          <button id="close" type="button" class="primary">Close</button>
+          <span id="status" class="muted" role="status"></span>
+        </footer>
+      </div>
+    </main>
+    <script type="module" src="./report.ts"></script>
+  </body>
+</html>

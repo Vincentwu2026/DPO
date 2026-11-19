@@ -4,12 +4,48 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+      content="default-src 'self'; script-src 'self'; style-src 'self'"
     />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Teams Eye Contact Coach</title>
+    <link rel="stylesheet" href="/src/home.css" />
   </head>
   <body>
-    <div id="app"></div>
+    <main>
+      <h1>Teams Eye Contact Coach</h1>
+      <p id="user" class="muted"></p>
+
+      <section class="next" id="next" hidden>
+        <h2>Next step</h2>
+        <p id="next-text"></p>
+      </section>
+
+      <ul class="status">
+        <li>
+          <span class="label">Calls</span>
+          <span id="meeting-line"></span>
+        </li>
+        <li>
+          <span class="label">Accuracy</span>
+          <span id="calibration-line"></span>
+        </li>
+        <li>
+          <span class="label">Dashboard</span>
+          <span id="cloud-line"></span>
+        </li>
+      </ul>
+
+      <div class="actions">
+        <button id="sign-in" type="button" class="primary" hidden>Sign in</button>
+        <button id="calibrate" type="button">Calibrate</button>
+        <button id="settings" type="button">Settings</button>
+      </div>
+      <p id="error" class="error" role="alert"></p>
+
+      <p class="muted foot">
+        The app keeps running in the menu bar or system tray after you close this window.
+      </p>
+    </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
