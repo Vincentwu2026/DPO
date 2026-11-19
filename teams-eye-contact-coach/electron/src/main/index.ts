@@ -381,29 +381,7 @@ function stopMeetingService(): void {
   if (sessionStartedAt !== null) endSession()
 }
 
-async function signIn(): Promise<void> {
-  await auth.signIn()
-  await startMeetingService()
-  syncPendingSessions()
-}
-
-async function signOut(): Promise<void> {
-  stopMeetingService()
-  await auth.signOut()
-}
-
 function registerIpcHandlers(): void {
-  ipcMain.handle('auth:sign-in', async () => {
-    await signIn()
-    await tray.refresh()
-    return auth.getSignedInUser()
-  })
-  ipcMain.handle('auth:sign-out', async () => {
-    await signOut()
-    await tray.refresh()
-  })
-  ipcMain.handle('auth:get-user', () => auth.getSignedInUser())
-
   ipcMain.handle('home:get-status', async () => {
     const user = await auth.getSignedInUser().catch(() => null)
     return buildHomeStatus({
@@ -528,7 +506,6 @@ void app.whenReady().then(async () => {
     releaseTracker: releaseTrackerAfterCalibration
   })
   tray = new TrayService({
-    auth,
     settings: {
       getTrackingMode: () => settings.getTrackingMode(),
       setTrackingMode: (mode) => {
@@ -536,8 +513,6 @@ void app.whenReady().then(async () => {
         onSettingsChanged()
       }
     },
-    signIn,
-    signOut,
     openHome: openHomeWindow,
     openSettings: openSettingsWindow,
     openCalibration: () => calibrationWindow.show(),

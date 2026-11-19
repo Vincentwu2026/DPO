@@ -26,10 +26,9 @@ when you look away for too long, and keeps a history you can review later.
 
 ## How it works in one minute
 
-1. The app lives in your **system tray** (Windows) or **menu bar** (macOS). Sign in once with your
-   work Microsoft 365 account.
-2. When you join a Teams call, the app notices (it checks your Teams presence every 15 seconds),
-   switches on your webcam and starts tracking where you are looking.
+1. The app lives in your **system tray** (Windows) or **menu bar** (macOS). There is no sign-in.
+2. When you join a Teams call, choose **Start Session** from the tray icon. The app switches on your
+   webcam and starts tracking where you are looking. Choose **Stop Session** when the call ends.
 3. A small **HUD** appears in the top-right corner of your screen showing your eye-contact
    percentage and whether you are looking at the camera, the screen, or away.
 4. If you look away from the camera for too long, the HUD flashes red and plays a soft ping.
@@ -69,21 +68,16 @@ follow the developer instructions in the [README](../README.md) (the variables a
 ## First-time setup
 
 1. **Install and start the app.** An icon appears in the system tray (Windows, bottom-right) or the
-   menu bar (macOS, top-right). A small status window also opens. It shows whether you are
-   signed in, whether you have calibrated, and what to do next. You can close it, and the app keeps
+   menu bar (macOS, top-right). A small status window also opens. It shows whether you have
+   calibrated and what to do next. You can close it, and the app keeps
    running from the tray; choose **Open Eye Contact Coach** in the tray menu to bring it back.
 2. **Allow camera access.** On macOS, approve the camera prompt the first time tracking starts. If
    you missed it, go to _System Settings > Privacy & Security > Camera_ and enable the app.
-3. **Sign in.** Click the tray icon and choose **Sign In**. Your browser opens the Microsoft
-   sign-in page. Approve the permissions requested (presence, online meetings, call records, and
-   access to the dashboard service if it is enabled).
-4. **Choose your tracking mode and camera.** Click the tray icon, then **Settings…** (see
+3. **Choose your tracking mode and camera.** Click the tray icon, then **Settings…** (see
    [Settings](#settings)). In particular, leave **Camera** on **Automatic** to use the camera
    Teams uses, or pick one yourself.
-5. **Check it works.** Join or start a Teams call, and within about 15 seconds the HUD should
-   appear (unless you chose Post-call mode).
-
-After the first sign-in the app signs you in automatically each time it starts.
+4. **Check it works.** Join or start a Teams call, click the tray icon and choose **Start
+   Session**. The HUD should appear straight away (unless you chose Post-call mode).
 
 ## Using it in a Teams meeting
 
@@ -96,18 +90,18 @@ turns on your webcam, starts tracking, and (in Real-time or Both mode) shows the
 Teams, an **Active presenter** badge appears (this is checked every 5 seconds, so it can lag a
 little behind). You can drag the HUD anywhere, collapse it to a dot, or mute its sound.
 
-**When you leave the call.** Within roughly 15 seconds the webcam turns off, the HUD disappears and
+**When you leave the call.** Choose **Stop Session** in the tray menu. The webcam turns off, the HUD disappears and
 the session is saved. If the dashboard is set up, the session uploads in the background. If the
-upload fails, the app retries and tries again the next time it starts or you sign in.
+upload fails, the app retries and tries again the next time it starts.
 
 **Tray menu.** Click the tray icon at any time to:
 
-| Item          | What it does                                  |
-| ------------- | --------------------------------------------- |
-| Sign In / Out | Sign in, or sign out (shows your name)        |
-| Tracking Mode | Switch between Real-time, Post-call and Both  |
-| Settings…     | Open the settings panel                       |
-| Quit          | Stop the app (an open session is saved first) |
+| Item                 | What it does                                  |
+| -------------------- | --------------------------------------------- |
+| Start / Stop Session | Start or stop tracking by hand                |
+| Tracking Mode        | Switch between Real-time, Post-call and Both  |
+| Settings…            | Open the settings panel                       |
+| Quit                 | Stop the app (an open session is saved first) |
 
 ### Tracking modes
 
@@ -217,7 +211,7 @@ few seconds were tracked. It shows:
 Buttons: **Export PDF** saves the report to your Downloads folder, named with the date and time
 (never the meeting title), and shows it in the folder. **View full history** opens the cloud
 dashboard in your browser; it only appears if your organisation has set the dashboard address.
-**Close** closes the report. Leaving the app or signing out does not pop a report up.
+**Close** closes the report. Quitting the app does not pop a report up.
 
 ## Reviewing your history
 
@@ -247,22 +241,21 @@ not part of those numbers.
 
 ## Troubleshooting
 
-| Problem                                         | What to try                                                                                                                                                                                |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| The HUD does not appear when I join a call      | Check you are signed in (tray menu shows "Sign Out (your name)"). Check the mode is not **Post-call**. Wait up to 15 seconds.                                                              |
-| The HUD never appears even after waiting        | Meeting detection needs the relay service and permissions set up by your admin. Ask them to check.                                                                                         |
-| "Waiting for camera" stays on the HUD           | Open Settings and choose the right camera. On macOS check camera permission in System Settings.                                                                                            |
-| The HUD shows the wrong camera's view           | Check that **Camera** in Settings is **Automatic**, or choose the right camera yourself. Automatic reads the camera from Teams' own settings and uses camera 0 if it cannot.               |
-| The calibration says my look was not steady     | Keep your eyes on the lens for the whole countdown, with your face well lit and in view, then **Try again**.                                                                               |
-| The calibration says lens and screen look alike | Sit a little closer, or look at the lower part of your screen for step 2. A camera far above the screen separates the two looks best.                                                      |
-| The dot flickers between zones                  | Set **Gaze steadiness** to Steady.                                                                                                                                                         |
-| It says "look at the camera" while I am looking | Run **Calibrate Eye Contact…** from the tray menu. Also try Steady, and check your face is well lit.                                                                                       |
-| The alert sound is annoying                     | Click the speaker icon on the HUD to mute it for this call, or switch off **Audio alert** in Settings.                                                                                     |
-| I cannot see the HUD in my screen share         | That is by design; the HUD is hidden from screen sharing.                                                                                                                                  |
-| The HUD is in the way                           | Drag it by the top grip, or collapse it to a dot.                                                                                                                                          |
-| My sessions are missing from the dashboard      | The upload may not be configured, may still be retrying, or you were not speaking. Sign out and in again to trigger a retry. Sessions recorded before cloud sync existed are not uploaded. |
-| Tracker could not start                         | Quit and restart the app. If it persists, report it to your admin.                                                                                                                         |
-| Active presenter badge is late or missing       | It is checked every 5 seconds, and depends on a Teams setting your admin controls.                                                                                                         |
+| Problem                                         | What to try                                                                                                                                                                          |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The HUD does not appear after Start Session     | Check the mode is not **Post-call**, and that the tray menu now says **Stop Session**.                                                                                               |
+| "Waiting for camera" stays on the HUD           | Open Settings and choose the right camera. On macOS check camera permission in System Settings.                                                                                      |
+| The HUD shows the wrong camera's view           | Check that **Camera** in Settings is **Automatic**, or choose the right camera yourself. Automatic reads the camera from Teams' own settings and uses camera 0 if it cannot.         |
+| The calibration says my look was not steady     | Keep your eyes on the lens for the whole countdown, with your face well lit and in view, then **Try again**.                                                                         |
+| The calibration says lens and screen look alike | Sit a little closer, or look at the lower part of your screen for step 2. A camera far above the screen separates the two looks best.                                                |
+| The dot flickers between zones                  | Set **Gaze steadiness** to Steady.                                                                                                                                                   |
+| It says "look at the camera" while I am looking | Run **Calibrate Eye Contact…** from the tray menu. Also try Steady, and check your face is well lit.                                                                                 |
+| The alert sound is annoying                     | Click the speaker icon on the HUD to mute it for this call, or switch off **Audio alert** in Settings.                                                                               |
+| I cannot see the HUD in my screen share         | That is by design; the HUD is hidden from screen sharing.                                                                                                                            |
+| The HUD is in the way                           | Drag it by the top grip, or collapse it to a dot.                                                                                                                                    |
+| My sessions are missing from the dashboard      | The upload may not be configured, may still be retrying, or you were not speaking. Restart the app to trigger a retry. Sessions recorded before cloud sync existed are not uploaded. |
+| Tracker could not start                         | Quit and restart the app. If it persists, report it to your admin.                                                                                                                   |
+| Active presenter badge is late or missing       | It is checked every 5 seconds, and depends on a Teams setting your admin controls.                                                                                                   |
 
 ## Known limits
 

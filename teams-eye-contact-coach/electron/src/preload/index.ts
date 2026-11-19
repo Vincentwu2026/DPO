@@ -5,12 +5,6 @@ const api = {
   platform: process.platform
 }
 
-const auth = {
-  signIn: () => ipcRenderer.invoke('auth:sign-in'),
-  signOut: () => ipcRenderer.invoke('auth:sign-out'),
-  getUser: () => ipcRenderer.invoke('auth:get-user')
-}
-
 const settings = {
   get: (key: string) => ipcRenderer.invoke('settings:get', key),
   set: (key: string, value: unknown) => ipcRenderer.invoke('settings:set', key, value),
@@ -100,7 +94,6 @@ const hud = {
 }
 
 contextBridge.exposeInMainWorld('api', api)
-contextBridge.exposeInMainWorld('auth', auth)
 contextBridge.exposeInMainWorld('settings', settings)
 contextBridge.exposeInMainWorld('meeting', meeting)
 contextBridge.exposeInMainWorld('gazeTracker', gazeTracker)

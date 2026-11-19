@@ -2,11 +2,6 @@ export interface PreloadApi {
   platform: NodeJS.Platform
 }
 
-export interface SignedInUser {
-  name: string
-  username: string
-}
-
 export interface SettingsValues {
   trackingMode: 'realtime' | 'postcall' | 'both'
   cameraIndex: number
@@ -21,12 +16,6 @@ export interface SettingsValues {
 export interface CameraDevice {
   index: number
   label: string
-}
-
-export interface AuthApi {
-  signIn(): Promise<SignedInUser | null>
-  signOut(): Promise<void>
-  getUser(): Promise<SignedInUser | null>
 }
 
 export interface SettingsApi {
@@ -175,7 +164,6 @@ export interface HudApi {
 declare global {
   interface Window {
     api: PreloadApi
-    auth: AuthApi
     settings: SettingsApi
     meeting: MeetingApi
     gazeTracker: GazeTrackerApi

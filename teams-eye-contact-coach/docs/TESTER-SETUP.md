@@ -47,8 +47,8 @@ npm run dev
 - Leave the terminal window open. Closing it stops the app. To quit properly, use **Quit** in the
   menu bar icon.
 
-You can ignore the Sign In item and any messages about Azure or sign-in. They are only for the
-automatic Teams detection, which needs IT setup.
+There is no sign-in. The app does not connect to Microsoft or Teams; you start and stop each session
+yourself.
 
 ## Calibrate once (recommended)
 

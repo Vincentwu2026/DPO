@@ -1,13 +1,9 @@
 import { join } from 'node:path'
 import { app, Menu, nativeImage, Tray, type MenuItemConstructorOptions } from 'electron'
-import type { AuthService } from '../auth/AuthService'
 import type { SettingsService, TrackingMode } from '../settings/SettingsService'
 
 export interface TrayDeps {
-  auth: Pick<AuthService, 'getSignedInUser'>
   settings: Pick<SettingsService, 'getTrackingMode' | 'setTrackingMode'>
-  signIn: () => Promise<void>
-  signOut: () => Promise<void>
   openHome: () => void
   openSettings: () => void
   openCalibration: () => void
@@ -35,10 +31,9 @@ export class TrayService {
     await this.refresh()
   }
 
-  /** Rebuild the context menu from current auth + settings state. */
+  /** Rebuild the context menu from current session + settings state. */
   async refresh(): Promise<void> {
     if (!this.tray) return
-    const user = await this.deps.auth.getSignedInUser().catch(() => null)
     const current = this.deps.settings.getTrackingMode()
 
     const template: MenuItemConstructorOptions[] = [
@@ -46,13 +41,6 @@ export class TrayService {
         label: this.deps.isSessionActive() ? 'Stop Session' : 'Start Session',
         click: () => this.deps.toggleSession()
       },
-      { type: 'separator' },
-      user
-        ? {
-            label: `Sign Out (${user.name})`,
-            click: () => void this.deps.signOut().then(() => this.refresh())
-          }
-        : { label: 'Sign In', click: () => void this.deps.signIn().then(() => this.refresh()) },
       { type: 'separator' },
       {
         label: 'Tracking Mode',
