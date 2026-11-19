@@ -22,7 +22,22 @@ stop each session yourself.
 
 ## Get the app
 
-There is no installer to download yet. You run it from source, which takes about five minutes.
+### Option 1: download (Mac with Apple Silicon)
+
+1. Open the [Releases page](https://github.com/Vincentwu2026/DPO/releases) and download
+   `Teams-Eye-Contact-Coach-<version>-arm64.dmg` (about 250 MB).
+2. Open the DMG and drag **Teams Eye Contact Coach** into **Applications**.
+3. Open the app from Applications. macOS will say it cannot verify the app, because it is not
+   signed with an Apple developer account. This is expected. Click **Done**, then go to
+   _System Settings > Privacy & Security_, scroll down to the message about the app and click
+   **Open Anyway**. You only need to do this once.
+   If you do not see that option, run this once in Terminal and open the app again:
+   `xattr -cr "/Applications/Teams Eye Contact Coach.app"`
+4. Allow camera access when macOS asks.
+
+No Node, Python or Git is needed. The download has not yet been tried on a second Mac.
+
+### Option 2: run from source
 
 **You need:** a Mac with a webcam (Windows is untested), [Node.js](https://nodejs.org) 20.19 or
 newer, Python 3.11 or newer, and Git.
@@ -40,12 +55,13 @@ npm run fetch:model
 npm run dev
 ```
 
-Allow camera access when macOS asks. Then follow the full guide:
-**[Tester setup](teams-eye-contact-coach/docs/TESTER-SETUP.md)**. It covers calibration, using it in
-a call, updating, and fixing common problems.
+Allow camera access when macOS asks. To update later, run `git pull` in the `DPO` folder and
+repeat the `npm install` and `pip install` steps.
 
-To update later, run `git pull` in the `DPO` folder and repeat the `npm install` and `pip install`
-steps.
+### After installing
+
+Follow **[Tester setup](teams-eye-contact-coach/docs/TESTER-SETUP.md)**. It covers calibration,
+using it in a call and fixing common problems.
 
 ## Documents
 

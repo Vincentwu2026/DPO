@@ -222,8 +222,13 @@ MSAL sign-in redirect itself has not been exercised.
 | `npm test -w backend`   | Run the API tests (supertest-style, via Fastify inject) |
 | `npm test -w dashboard` | Run the dashboard logic tests                           |
 
-Distributables (run from `electron/`): `npm run build:win` (NSIS installer) and
-`npm run build:mac` (DMG). Build each on its target OS.
+Distributables: build on the target OS. For a Mac (Apple Silicon) DMG, from the repo root run
+`npm run fetch:model` and `npm run build:tracker`, then from `electron/` run `npm run build:mac`. The
+DMG is written to `electron/dist/Teams-Eye-Contact-Coach-<version>-arm64.dmg` (about 250 MB). It is
+ad-hoc signed, not notarized: other Macs need _System Settings > Privacy & Security > Open Anyway_
+on first launch. Upload it as a GitHub Release asset (it is far too large to commit). Windows
+(`npm run build:win`) has not been tried. If you change the `electron` version in `package.json`,
+update `electronVersion` in `electron/electron-builder.yml` too.
 
 ## Troubleshooting
 
