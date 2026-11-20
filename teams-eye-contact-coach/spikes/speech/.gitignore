@@ -1,0 +1,6 @@
+audio/*.wav
+dist/
+build/
+*.spec
+results.jsonl
+build.log

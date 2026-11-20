@@ -1,0 +1,6 @@
+{
+ "fillers": "So, um, today I want to, uh, talk about our cloud platform. I think it can, you know, basically help your team save time. Um, maybe we could start with a quick demo, I guess. Sorry, let me, uh, share my screen.",
+ "clean": "Thanks for joining. Today I will show how our platform cuts your deployment time in half. We will cover three things: setup, security, and cost. Let me start with setup, which takes about ten minutes.",
+ "conversational": "Hey, thanks for making time. I'd love to hear what you're working on right now. Do you have a team that handles deployments? What's been the biggest headache for you? Honestly, we've seen the same thing with a lot of folks, and here's what worked for them.",
+ "pauses": "Let me walk you through the architecture. [[slnc 3000]] The first layer handles authentication. [[slnc 2500]] The second layer stores your data securely. [[slnc 3000]] Any questions so far?"
+}

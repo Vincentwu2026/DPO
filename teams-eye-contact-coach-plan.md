@@ -436,7 +436,7 @@ Show an in-app post-session report window immediately after a meeting ends, so t
 
 ### Proposed Addition — Speech Coach (optional speech analysis in any live session)
 
-**Status:** [ ] planned, not started. The scope decisions are made (below); Phase 0 is a go/no-go spike.
+**Status:** [-] SC-0 spike run on synthetic speech and a real mic; verdict **conditional**: engine and speed pass, size and echo do not yet. Two checks need a person (see SC-0 findings). Scope decisions are made (below).
 
 **Goal:** In any live session, the user can switch on speech analysis. The app transcribes their speech on the device and scores how **confident** and how **conversational** they sounded. The result appears in the **conclusion of the report**, next to the eye-contact results, and is then discarded.
 
@@ -506,6 +506,29 @@ Output: two 0 to 100 scores, up to three delivery tips in the style of `generate
 | **4. Report** | Delivery section in the conclusion of the report (scores, component bars, tips, analysed-time note) and in the PDF export; hidden when there is not enough speech | Report shows both parts, and a restart shows no speech data |
 | **5. Packaging and privacy** | `NSMicrophoneUsageDescription` and the `com.apple.security.device.audio-input` entitlement on macOS; rebuild the DMG; update the USER-GUIDE privacy section (today it only mentions video); bundle the model | Packaged app asks for the mic and works |
 | **6. Optional later** | Volume and pitch variation (monotone check), other languages | Separate decision |
+
+#### SC-0 findings (Apple M5 Pro, 24 GB; code in `teams-eye-contact-coach/spikes/speech/`)
+
+Tested with four clips made by macOS `say` (fillers, clean, conversational, pauses), faster-whisper int8 on CPU, voice-activity filter on.
+
+| Check | Result | Verdict |
+|---|---|---|
+| Speed (real-time factor, lower is faster) | `tiny.en` 0.02 to 0.04, `base.en` 0.03 to 0.05, `small.en` 0.08 to 0.14. A 15 s clip takes about 0.7 s with `base.en`. | Pass. A phrase is transcribed well under 3 s after it ends. |
+| Accuracy (word error rate) | `base.en` 0.0 to 0.03, `tiny.en` 0.0 to 0.14, `small.en` 0.0 to 0.06 | `base.en` is the best fit |
+| Gaze tracker alongside Whisper | Tracker CPU 38% alone, 23% with Whisper running; gaze events stayed at 30 per second in all three runs; system CPU rose from 13% to about 40% | Pass on this machine only |
+| Pause detection | 3 of 3 long pauses found in the pauses clip, with `base.en` and `small.en` (`tiny.en` found 0) | Pass with `base.en` |
+| Filler words kept | 7 of 7 with every model, with and without a priming prompt | **Not conclusive.** Synthetic speech says "um" clearly; real, quick fillers are the known weak spot. Needs a person (below). |
+| Packaged size | PyInstaller bundle of the engine **178 MB** (onnxruntime 75 MB, av 43 MB, numpy 34 MB), plus the model: `tiny.en` 74 MB, `base.en` 141 MB, `small.en` 464 MB. The frozen binary loads and transcribes. | **Over budget.** `base.en` totals about 320 MB against the 150 MB goal, roughly doubling the 243 MB DMG. Possible cuts (not tried): drop `av` by passing arrays only, replace the onnxruntime VAD with a simple energy gate, use `tiny.en`. |
+| Mic capture | Works from Python after the permission prompt; two inputs listed, the MacBook mic and a "Microsoft Teams Audio" virtual device | Pass |
+| **Echo from speakers** | Speech played through the laptop speakers was transcribed from the mic **in full**, at 25% volume and at 50% volume | **Fail without a fix.** On speakers, other people's voices in a call would be scored as the user's. |
+
+**Verdict: conditional go.** The engine is fast and accurate enough, but two things must be resolved before SC-1:
+1. **Echo.** Options: require headphones for analysis (with a warning when the mic hears the call); use macOS voice processing, which echo-cancels (Teams does this), which means capturing the mic through a different API than the one tested; or limit analysis to rehearsals (D1 fallback). A real-call test decides which is viable.
+2. **Size.** Pick a model and trim the bundle, or accept a larger installer.
+
+**Still needs a person (not done):**
+- *Real fillers:* run `spikes/speech/.venv/bin/python user_mic_test.py` and talk naturally for 40 s. Compare the fillers heard with the ones you counted. Nothing is saved.
+- *Real Teams call:* with the mic on in a Teams call, check whether the app can also read the mic, and whether the other side's voice leaks in on speakers vs headphones.
 
 #### Risks
 
